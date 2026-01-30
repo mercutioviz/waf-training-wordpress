@@ -7,7 +7,7 @@ source /tmp/scripts/utils/logging.sh
 # WP-CLI wrapper with error handling
 wp_cli() {
     log_debug "Running: wp $*"
-    wp "$@" --allow-root --path=/var/www/html 2>&1
+    php -d memory_limit=2048M /usr/local/bin/wp "$@" --allow-root --path=/var/www/html 2>&1
     local exit_code=$?
     if [ ${exit_code} -ne 0 ]; then
         log_error "WP-CLI command failed: wp $*"

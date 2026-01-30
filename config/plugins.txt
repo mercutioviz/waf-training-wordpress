@@ -24,13 +24,13 @@ wpforms-lite
 woocommerce-gateway-stripe
 
 # Product add-ons (custom fields = more parameters)
-woocommerce-product-addons
+#woocommerce-product-addons
 
 # Wishlist (adds cookies)
 yith-woocommerce-wishlist
 
 # Product reviews with photos
-photo-reviews-for-woocommerce
+#photo-reviews-for-woocommerce
 
 # ============================================
 # SEO & Analytics
@@ -63,7 +63,7 @@ advanced-custom-fields
 instagram-feed
 
 # Slider/carousel (image galleries)
-metaslider
+#metaslider
 
 # ============================================
 # Security & Spam
