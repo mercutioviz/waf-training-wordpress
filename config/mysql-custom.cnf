@@ -16,14 +16,14 @@ connect_timeout = 10
 wait_timeout = 600
 
 # Query cache (if using MySQL 5.7)
-query_cache_type = 1
-query_cache_size = 32M
-query_cache_limit = 2M
+#query_cache_type = 1
+#query_cache_size = 32M
+#query_cache_limit = 2M
 
 # Logging (disabled for performance, enable for debugging)
-slow_query_log = 0
-long_query_time = 2
-log_error = /var/log/mysql/error.log
+#slow_query_log = 0
+#long_query_time = 2
+#log_error = /var/log/mysql/error.log
 
 # Binary logging (disabled for training environment)
 skip-log-bin
