@@ -1,0 +1,62 @@
+{
+  "zones": [
+    {
+      "name": "United States",
+      "regions": [
+        {
+          "type": "country",
+          "code": "US"
+        }
+      ],
+      "methods": [
+        {
+          "method_id": "flat_rate",
+          "enabled": true,
+          "settings": {
+            "title": "Standard Shipping",
+            "cost": "5.99"
+          }
+        },
+        {
+          "method_id": "flat_rate",
+          "enabled": true,
+          "settings": {
+            "title": "Express Shipping",
+            "cost": "15.99"
+          }
+        },
+        {
+          "method_id": "free_shipping",
+          "enabled": true,
+          "settings": {
+            "title": "Free Shipping",
+            "min_amount": "75.00"
+          }
+        }
+      ]
+    },
+    {
+      "name": "International",
+      "regions": [
+        {
+          "type": "continent",
+          "code": "EU"
+        },
+        {
+          "type": "continent",
+          "code": "NA"
+        }
+      ],
+      "methods": [
+        {
+          "method_id": "flat_rate",
+          "enabled": true,
+          "settings": {
+            "title": "International Shipping",
+            "cost": "25.00"
+          }
+        }
+      ]
+    }
+  ]
+}

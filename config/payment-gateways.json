@@ -1,0 +1,29 @@
+{
+  "gateways": {
+    "bacs": {
+      "enabled": "yes",
+      "title": "Direct Bank Transfer",
+      "description": "Make your payment directly into our bank account.",
+      "instructions": "Please use your Order ID as the payment reference."
+    },
+    "cheque": {
+      "enabled": "yes",
+      "title": "Check Payments",
+      "description": "Please send a check to our office address.",
+      "instructions": "Make checks payable to Summit Outfitters."
+    },
+    "cod": {
+      "enabled": "yes",
+      "title": "Cash on Delivery",
+      "description": "Pay with cash upon delivery."
+    },
+    "stripe": {
+      "enabled": "yes",
+      "title": "Credit Card (Stripe)",
+      "description": "Pay securely with your credit card.",
+      "testmode": "yes",
+      "test_publishable_key": "pk_test_dummy_key_for_training",
+      "test_secret_key": "sk_test_dummy_key_for_training"
+    }
+  }
+}
