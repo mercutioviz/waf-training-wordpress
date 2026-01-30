@@ -1,0 +1,57 @@
+# Environment files
+.env
+
+# Docker volumes and data
+wordpress-data/
+mysql-data/
+volumes/
+
+# Database dumps
+*.sql
+*.sql.gz
+
+# WordPress
+wordpress/wp-content/uploads/
+wordpress/wp-content/cache/
+wordpress/wp-content/upgrade/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Backup files
+*.bak
+*.backup
+
+# Downloaded images (regenerated at runtime)
+data/images/downloaded/
+
+# Test artifacts
+test-results/
+coverage/
