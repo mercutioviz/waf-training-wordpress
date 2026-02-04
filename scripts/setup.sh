@@ -22,15 +22,15 @@ fi
 
 # Setup steps
 STEPS=(
-#    "01-wait-for-wordpress.sh"
-#    "02-install-plugins.sh"
-#    "03-configure-wordpress.sh"
-#    "04-setup-woocommerce.sh"
-#    "05-import-products.sh"
-#    "06-import-content.sh"
-#    "07-create-users.sh"
-#    "08-generate-orders.sh"
-#    "09-add-reviews.sh"
+    "01-wait-for-wordpress.sh"
+    "02-install-plugins.sh"
+    "03-configure-wordpress.sh"
+    "04-setup-woocommerce.sh"
+    "05-import-products.sh"
+    "06-import-content.sh"
+    "07-create-users.sh"
+    "08-generate-orders.sh"
+    "09-add-reviews.sh"
     "10-finalize.sh"
 )
 
