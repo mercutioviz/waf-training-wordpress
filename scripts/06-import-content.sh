@@ -22,9 +22,13 @@ BLOG_CATEGORIES=(
 for cat_data in "${BLOG_CATEGORIES[@]}"; do
     IFS=':' read -r cat_name cat_slug <<< "${cat_data}"
     
-    if ! wp_cli term get category "${cat_slug}" 2>/dev/null; then
-        wp_cli term create category "${cat_name}" --slug="${cat_slug}"
+    # Check if category exists (suppress errors)
+    if ! wp_cli term get category "${cat_slug}" >/dev/null 2>&1; then
+        # Create category (don't fail if it exists)
+        wp_cli term create category "${cat_name}" --slug="${cat_slug}" 2>/dev/null || log_debug "Category already exists: ${cat_name}"
         log_info "Created category: ${cat_name}"
+    else
+        log_debug "Category already exists: ${cat_name}"
     fi
 done
 
@@ -69,7 +73,7 @@ for post_data in "${POSTS[@]}"; do
         --post_status=publish \
         --post_category="${CAT_TERM}" \
         --post_author=1 \
-        --porcelain 2>/dev/null)
+        --porcelain) || true
     
     # Set random date in the past (last 6 months)
     RANDOM_DAYS=$((RANDOM % 180))

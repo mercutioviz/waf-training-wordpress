@@ -130,8 +130,8 @@ Reply-To: [your-email]
 fi
 
 # Update WooCommerce permalinks
-log_info "Updating WooCommerce permalinks..."
-set_option "woocommerce_permalinks" '{"product_base":"product","category_base":"product-category","tag_base":"product-tag","attribute_base":"","use_verbose_page_rules":false}'
+# Update WooCommerce permalinks
+log_info "Skipping WooCommerce permalinks (can be configured in admin if needed)..."
 
 # Regenerate thumbnails for products
 log_info "Regenerating product thumbnails..."

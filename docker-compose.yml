@@ -48,6 +48,7 @@ services:
         define('SCRIPT_DEBUG', ${SCRIPT_DEBUG:-false});
         define('WP_MEMORY_LIMIT', '1024M');
         define('WP_MAX_MEMORY_LIMIT', '1024M');
+        @ini_set('memory_limit', '2048M');
         define('AUTOMATIC_UPDATER_DISABLED', true);
         define('DISABLE_WP_CRON', false);
         define('FS_METHOD', 'direct');

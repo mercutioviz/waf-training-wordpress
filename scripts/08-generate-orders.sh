@@ -52,14 +52,14 @@ for i in $(seq 1 ${NUM_ORDERS}); do
     
     # Generate random date in the past (last 6 months)
     DAYS_AGO=$((RANDOM % 180 + 1))
-    ORDER_DATE=$(date -d "${DAYS_AGO} days ago" '+%Y-%m-%d %H:%M:%S')
+    ORDER_DATE=$(date -d "${DAYS_AGO} days ago" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')
     
     # Create order
     ORDER_ID=$(wp_cli wc order create \
         --customer_id=${CUSTOMER_ID} \
         --status=${ORDER_STATUS} \
         --user="${WORDPRESS_ADMIN_USER}" \
-        --porcelain 2>/dev/null)
+        --porcelain 2>/dev/null) || continue
     
     if [ -z "${ORDER_ID}" ]; then
         log_debug "Failed to create order ${i}"

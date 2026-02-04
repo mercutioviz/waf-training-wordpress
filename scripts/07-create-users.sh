@@ -81,8 +81,11 @@ log_success "User account creation complete"
 
 # Display user counts by role
 log_info "User statistics:"
-wp_cli user list --role=administrator --format=count | xargs -I {} log_info "Administrators: {}"
-wp_cli user list --role=shop_manager --format=count | xargs -I {} log_info "Shop Managers: {}"
-wp_cli user list --role=customer --format=count | xargs -I {} log_info "Customers: {}"
+ADMIN_COUNT=$(wp_cli user list --role=administrator --format=count)
+log_info "Administrators: ${ADMIN_COUNT}"
+SHOP_MGR_COUNT=$(wp_cli user list --role=shop_manager --format=count)
+log_info "Shop Managers: ${SHOP_MGR_COUNT}"
+CUSTOMER_COUNT=$(wp_cli user list --role=customer --format=count)
+log_info "Customers: ${CUSTOMER_COUNT}"
 
 exit 0

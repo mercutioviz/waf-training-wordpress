@@ -1,5 +1,1 @@
-# WordPress Theme
-# Format: theme-slug
-
-# Astra - Lightweight, WooCommerce-optimized theme
 astra

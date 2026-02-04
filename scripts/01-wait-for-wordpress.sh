@@ -38,4 +38,10 @@ fi
 
 log_info "WordPress version: $(wp_cli core version)"
 
+# Force memory limits using wp-cli eval
+log_info "Configuring memory limits..."
+wp_cli eval 'file_put_contents(ABSPATH . "wp-config.php", preg_replace("/^<\?php/m", "<?php\ndefine(\"WP_MEMORY_LIMIT\", \"2048M\");\ndefine(\"WP_MAX_MEMORY_LIMIT\", \"2048M\");\n@ini_set(\"memory_limit\", \"2048M\");", file_get_contents(ABSPATH . "wp-config.php"), 1));'
+
+log_success "Memory limits configured"
+
 exit 0
