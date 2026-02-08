@@ -78,6 +78,7 @@ services:
       - ./forms-config.json:/forms-config.json
       - ./wp-cli.yml:/var/www/html/wp-cli.yml
     environment:
+      PHP_OPTIONS: "-d memory_limit=512M"
       WORDPRESS_DB_HOST: db:3306
       WORDPRESS_DB_NAME: wordpress
       WORDPRESS_DB_USER: wordpress

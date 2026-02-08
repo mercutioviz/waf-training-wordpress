@@ -30,6 +30,28 @@ print_info() {
     echo -e "${YELLOW}[i]${NC} $1"
 }
 
+## Force memory limit
+# Define the path to wp-config
+WP_CONFIG="/var/www/html/wp-config.php"
+
+# 1. Ensure the constants are present in wp-config.php
+# We use 'grep' to check if they exist; if not, we use 'sed' to insert them after the <?php tag.
+if ! grep -q "WP_MEMORY_LIMIT" "$WP_CONFIG"; then
+    echo "Configuring WP_MEMORY_LIMIT..."
+    sed -i "/<?php/a define( 'WP_MEMORY_LIMIT', '512M' );" "$WP_CONFIG"
+fi
+
+if ! grep -q "WP_MAX_MEMORY_LIMIT" "$WP_CONFIG"; then
+    echo "Configuring WP_MAX_MEMORY_LIMIT..."
+    sed -i "/<?php/a define( 'WP_MAX_MEMORY_LIMIT', '512M' );" "$WP_CONFIG"
+fi
+
+# 2. Export the environment variable for the remainder of this script's execution
+# This forces the PHP engine running WP-CLI to ignore the system-wide 128MB limit.
+export WP_CLI_PHP_ARGS="-d memory_limit=512M"
+
+echo "Memory limits updated and exported. Proceeding with installations..."
+
 # Wait for WordPress to be ready
 print_info "Waiting for WordPress to be ready..."
 max_attempts=60
