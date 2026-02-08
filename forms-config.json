@@ -1,0 +1,29 @@
+{
+  "forms": [
+    {
+      "title": "Contact Us",
+      "form_content": "[text* your-name placeholder \"Your Name\"]\n\n[email* your-email placeholder \"Email Address\"]\n\n[tel your-phone placeholder \"Phone Number (optional)\"]\n\n[select your-subject \"General Inquiry\" \"Product Question\" \"Technical Support\" \"Partnership Opportunity\" \"Other\"]\n\n[textarea* your-message placeholder \"How can we help you? Feel free to include error messages, code snippets, or technical details.\"]\n\n[file your-attachment limit:5mb filetypes:jpg|jpeg|png|pdf|txt|log]\n\n[checkbox consent use_label_element \"I agree to the privacy policy\"]\n\n[submit \"Send Message\"]",
+      "mail_template": "Subject: [your-subject]\n\nFrom: [your-name] <[your-email]>\nPhone: [your-phone]\n\nMessage:\n[your-message]\n\n--\nThis message was sent from the contact form on TechGear Pro"
+    },
+    {
+      "title": "Technical Support",
+      "form_content": "[text* customer-name placeholder \"Your Name\"]\n\n[email* customer-email placeholder \"Email Address\"]\n\n[text order-number placeholder \"Order Number (if applicable)\"]\n\n[select product-category \"Laptops\" \"Accessories\" \"Cables & Adapters\" \"Gaming\" \"Smart Home\" \"Networking\" \"Storage\" \"PC Components\" \"Other\"]\n\n[text* product-name placeholder \"Product Name or SKU\"]\n\n[textarea* issue-description placeholder \"Please describe your technical issue in detail. Include error messages, screenshots, or system information if relevant. Example: 'Getting error: Cannot connect to server at 192.168.1.1'\"]\n\n[textarea troubleshooting-steps placeholder \"What troubleshooting steps have you already tried?\"]\n\n[file attachments limit:10mb filetypes:jpg|jpeg|png|pdf|txt|log|xml|json]\n\n[select urgency \"Low - General question\" \"Medium - Issue affecting usage\" \"High - Product not working\" \"Critical - Business impacting\"]\n\n[submit \"Submit Support Request\"]",
+      "mail_template": "Subject: Technical Support Request - [product-name]\n\nFrom: [customer-name] <[customer-email]>\nOrder: [order-number]\nCategory: [product-category]\nUrgency: [urgency]\n\nIssue Description:\n[issue-description]\n\nTroubleshooting Attempted:\n[troubleshooting-steps]\n\n--\nThis request was submitted from TechGear Pro Support"
+    },
+    {
+      "title": "Product Inquiry",
+      "form_content": "[text* your-name placeholder \"Your Name\"]\n\n[email* your-email placeholder \"Email Address\"]\n\n[text company placeholder \"Company Name (optional)\"]\n\n[textarea* product-interest placeholder \"What product(s) are you interested in? Include specifications or requirements.\"]\n\n[select quantity \"1-5 units\" \"6-10 units\" \"11-50 units\" \"51-100 units\" \"100+ units\"]\n\n[textarea special-requirements placeholder \"Any special requirements? (e.g., 'Need USB-C ports on all sides', 'Must support Linux kernel 5.15+', 'Require <script> tag filtering')\"]\n\n[checkbox newsletter use_label_element \"Subscribe to our newsletter for deals & updates\"]\n\n[submit \"Send Inquiry\"]",
+      "mail_template": "Subject: Product Inquiry from [your-name]\n\nFrom: [your-name] <[your-email]>\nCompany: [company]\nQuantity: [quantity]\n\nProducts of Interest:\n[product-interest]\n\nSpecial Requirements:\n[special-requirements]\n\nNewsletter: [newsletter]\n\n--\nThis inquiry was sent from TechGear Pro"
+    },
+    {
+      "title": "Partnership Request",
+      "form_content": "[text* contact-name placeholder \"Contact Person\"]\n\n[email* contact-email placeholder \"Business Email\"]\n\n[text* company-name placeholder \"Company Name\"]\n\n[url company-website placeholder \"Company Website (https://)\"]\n\n[select partnership-type \"Reseller/Distributor\" \"Affiliate Marketing\" \"OEM/White Label\" \"Technology Integration\" \"Co-Marketing\" \"Other\"]\n\n[textarea* partnership-proposal placeholder \"Describe your partnership proposal. Include details about your business model, target market, and how we can collaborate. URLs and technical specs welcome.\"]\n\n[text expected-volume placeholder \"Expected Monthly Volume (if applicable)\"]\n\n[file business-documents limit:10mb filetypes:pdf|doc|docx|ppt|pptx]\n\n[submit \"Submit Partnership Request\"]",
+      "mail_template": "Subject: Partnership Request - [company-name]\n\nFrom: [contact-name] <[contact-email]>\nCompany: [company-name]\nWebsite: [company-website]\nType: [partnership-type]\n\nProposal:\n[partnership-proposal]\n\nExpected Volume: [expected-volume]\n\n--\nThis partnership request was sent from TechGear Pro"
+    },
+    {
+      "title": "Developer API Access",
+      "form_content": "[text* developer-name placeholder \"Your Name\"]\n\n[email* developer-email placeholder \"Email Address\"]\n\n[text github-profile placeholder \"GitHub Profile (optional)\"]\n\n[select api-purpose \"Personal Project\" \"Commercial Application\" \"Research\" \"Integration Testing\" \"Other\"]\n\n[textarea* use-case placeholder \"Describe your use case and what endpoints you need. Example: 'Building inventory management system, need GET /api/products?filter=<category>'\"]\n\n[textarea technical-requirements placeholder \"Any specific technical requirements or data formats? (JSON, XML, GraphQL, etc.)\"]\n\n[number expected-requests placeholder \"Expected API requests per day\"]\n\n[checkbox terms use_label_element \"I agree to the API Terms of Service\"]\n\n[submit \"Request API Access\"]",
+      "mail_template": "Subject: API Access Request from [developer-name]\n\nFrom: [developer-name] <[developer-email]>\nGitHub: [github-profile]\nPurpose: [api-purpose]\n\nUse Case:\n[use-case]\n\nTechnical Requirements:\n[technical-requirements]\n\nExpected Daily Requests: [expected-requests]\n\n--\nThis API request was sent from TechGear Pro Developer Portal"
+    }
+  ]
+}

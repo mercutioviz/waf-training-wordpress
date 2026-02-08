@@ -1,130 +1,95 @@
 services:
-  # MySQL Database
   db:
-    image: mysql:${MYSQL_VERSION:-8.0}
-    container_name: waf-training-db
+    image: mysql:8.0
+    container_name: techgear_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress_pass
+      MYSQL_ROOT_PASSWORD: root_pass
     volumes:
-      - db_data:/var/lib/mysql
-      - ./config/mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf:ro
+      - mysql_data:/var/lib/mysql
     networks:
-      - waf-training-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - techgear_network
 
-  # WordPress with WooCommerce
   wordpress:
-    build:
-      context: ./wordpress
-      dockerfile: Dockerfile
-      args:
-        WORDPRESS_VERSION: ${WORDPRESS_VERSION:-latest}
-    container_name: waf-training-wordpress
+    image: wordpress:latest
+    container_name: techgear_wordpress
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     environment:
-      # Database connection
-      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
-      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX:-wp_}
-      
-      # WordPress configuration
-      WORDPRESS_DEBUG: ${WORDPRESS_DEBUG:-false}
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress_pass
+      WORDPRESS_DEBUG: 1
       WORDPRESS_CONFIG_EXTRA: |
-        define('WP_DEBUG_LOG', ${WORDPRESS_DEBUG_LOG:-false});
-        define('WP_DEBUG_DISPLAY', ${WORDPRESS_DEBUG_DISPLAY:-false});
-        define('SCRIPT_DEBUG', ${SCRIPT_DEBUG:-false});
-        define('WP_MEMORY_LIMIT', '1024M');
-        define('WP_MAX_MEMORY_LIMIT', '1024M');
-        @ini_set('memory_limit', '2048M');
-        define('AUTOMATIC_UPDATER_DISABLED', true);
-        define('DISABLE_WP_CRON', false);
-        define('FS_METHOD', 'direct');
+        define('WP_DEBUG_LOG', true);
+        define('WP_DEBUG_DISPLAY', false);
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./logs:/var/www/html/wp-content/logs
+    networks:
+      - techgear_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: techgear_nginx
+    restart: unless-stopped
     ports:
-      - "${LISTEN_IP:-0.0.0.0}:${LISTEN_PORT:-8080}:80"
+      - "8080:80"
     volumes:
       - wordpress_data:/var/www/html
-      - ./wordpress/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
-      - ./wordpress/.htaccess:/var/www/html/.htaccess:rw
-      - ./data:/tmp/data:ro
-      - ./scripts:/tmp/scripts:ro
-      - ./config:/tmp/config:ro
-    networks:
-      - waf-training-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/wp-admin/install.php"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-
-  # Setup orchestrator (runs once)
-  setup:
-    build:
-      context: ./wordpress
-      dockerfile: Dockerfile
-      args:
-        WORDPRESS_VERSION: ${WORDPRESS_VERSION:-latest}
-    container_name: waf-training-setup
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./logs/nginx:/var/log/nginx
     depends_on:
-      wordpress:
-        condition: service_healthy
+      - wordpress
+    networks:
+      - techgear_network
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: techgear_phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8081:80"
     environment:
-      # Pass all environment variables
-      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
-      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      WORDPRESS_ADMIN_USER: ${WORDPRESS_ADMIN_USER}
-      WORDPRESS_ADMIN_PASSWORD: ${WORDPRESS_ADMIN_PASSWORD}
-      WORDPRESS_ADMIN_EMAIL: ${WORDPRESS_ADMIN_EMAIL}
-      WORDPRESS_SITE_TITLE: ${WORDPRESS_SITE_TITLE}
-      WORDPRESS_SITE_URL: ${WORDPRESS_SITE_URL}
-      WORDPRESS_SITE_TAGLINE: ${WORDPRESS_SITE_TAGLINE}
-      STORE_ADDRESS: ${STORE_ADDRESS}
-      STORE_ADDRESS_2: ${STORE_ADDRESS_2}
-      STORE_CITY: ${STORE_CITY}
-      STORE_POSTCODE: ${STORE_POSTCODE}
-      STORE_COUNTRY: ${STORE_COUNTRY}
-      STORE_STATE: ${STORE_STATE}
-      STORE_CURRENCY: ${STORE_CURRENCY}
-      NUM_PRODUCTS: ${NUM_PRODUCTS}
-      NUM_ORDERS: ${NUM_ORDERS}
-      NUM_CUSTOMERS: ${NUM_CUSTOMERS}
-      NUM_POSTS: ${NUM_POSTS}
-      NUM_REVIEWS: ${NUM_REVIEWS}
-      AUTO_SETUP: ${AUTO_SETUP:-true}
-      SKIP_IMAGE_DOWNLOAD: ${SKIP_IMAGE_DOWNLOAD:-false}
-      GENERATE_SAMPLE_ORDERS: ${GENERATE_SAMPLE_ORDERS:-true}
-      VERBOSE_SETUP: ${VERBOSE_SETUP:-true}
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: root_pass
+    depends_on:
+      - db
+    networks:
+      - techgear_network
+
+  wpcli:
+    image: wordpress:cli
+    container_name: techgear_wpcli
+    user: "33:33"
+    depends_on:
+      - wordpress
+      - db
     volumes:
       - wordpress_data:/var/www/html
-      - ./data:/tmp/data:ro
-      - ./scripts:/tmp/scripts:ro
-      - ./config:/tmp/config:ro
+      - ./setup.sh:/setup.sh
+      - ./products.csv:/products.csv
+      - ./forms-config.json:/forms-config.json
+      - ./wp-cli.yml:/var/www/html/wp-cli.yml
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress_pass
     networks:
-      - waf-training-network
-    entrypoint: ["/bin/bash", "/tmp/scripts/setup.sh"]
-    restart: "no"
-
-networks:
-  waf-training-network:
-    driver: bridge
+      - techgear_network
+    command: tail -f /dev/null
 
 volumes:
-  db_data:
-    driver: local
+  mysql_data:
   wordpress_data:
-    driver: local
+
+networks:
+  techgear_network:
+    driver: bridge

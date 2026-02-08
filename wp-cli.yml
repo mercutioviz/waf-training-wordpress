@@ -1,0 +1,24 @@
+# WP-CLI Configuration for TechGear Pro
+# This file ensures WP-CLI has proper context when running commands
+
+# Set the WordPress URL (prevents HTTP_HOST warnings)
+url: http://localhost:8080
+
+# Default command parameters
+core install:
+  url: http://localhost:8080
+  title: TechGear Pro
+  admin_user: admin
+  admin_email: admin@techgearpro.local
+
+# Disable color output (better for logs)
+color: false
+
+# Allow running as root (required in container)
+allow-root: true
+
+# Quiet mode for cleaner output
+quiet: false
+
+# Apache modules to load (none needed for nginx)
+apache_modules: []
