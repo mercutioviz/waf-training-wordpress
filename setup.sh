@@ -81,7 +81,7 @@ configure_wordpress_constants() {
     print_info "Configuring WordPress constants..."
     wp config set WP_HOME "http://localhost:8080" --allow-root 2>/dev/null || true
     wp config set WP_SITEURL "http://localhost:8080" --allow-root 2>/dev/null || true
-    wp config set WP_CLI "true" --raw --allow-root 2>/dev/null || true
+    ##wp config set WP_CLI "true" --raw --allow-root 2>/dev/null || true
     print_status "WordPress constants configured"
 }
 
