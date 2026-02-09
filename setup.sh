@@ -81,7 +81,7 @@ configure_wordpress_constants() {
     print_info "Configuring WordPress constants (dynamic host, protocol-aware)..."
 
     # We need to inject a PHP block that detects the scheme and sets WP_HOME/WP_SITEURL.
-     #wp config set can't handle multi-line expressions, so we use a helper PHP script.
+    # wp config set can't handle multi-line expressions, so we use a helper PHP script.
     php -r "
         \$file = '/var/www/html/wp-config.php';
         \$content = file_get_contents(\$file);
@@ -162,12 +162,107 @@ configure_woocommerce() {
 
 import_products() {
     print_info "Importing products from CSV..."
-    if [ -f /products.csv ]; then
-        wp wc product import /products.csv --user=admin --allow-root 2>/dev/null || print_info "Product import completed (some warnings expected)"
-        print_status "Products imported"
-    else
+    if [ ! -f /products.csv ]; then
         print_error "products.csv not found, skipping product import"
+        return 1
     fi
+
+    # Use WooCommerce PHP API directly since 'wp wc product import' is not
+    # available in WooCommerce 10.x
+    wp eval-file - --allow-root <<'IMPORT_PHP'
+<?php
+$file = "/products.csv";
+$handle = fopen($file, "r");
+$headers = fgetcsv($handle, 0, ",");
+$header_count = count($headers);
+$imported = 0;
+$failed = 0;
+$skipped = 0;
+$line = 1;
+
+while (($row = fgetcsv($handle, 0, ",")) !== false) {
+    $line++;
+    // Trim trailing empty fields (handles trailing commas in CSV)
+    while (count($row) > $header_count && trim(end($row)) === '') {
+        array_pop($row);
+    }
+    if (count($row) !== $header_count) {
+        WP_CLI::warning("Skipped line $line: expected $header_count cols, got " . count($row));
+        $skipped++;
+        continue;
+    }
+
+    $data = array_combine($headers, $row);
+
+    // Skip duplicate SKUs
+    if (wc_get_product_id_by_sku($data['SKU'])) {
+        $skipped++;
+        continue;
+    }
+
+    $product = new WC_Product_Simple();
+    $product->set_name($data['Name']);
+    $product->set_sku($data['SKU']);
+    $product->set_status($data['Published'] == '1' ? 'publish' : 'draft');
+    $product->set_short_description($data['Short description']);
+    $product->set_description($data['Description']);
+    $product->set_regular_price($data['Regular price']);
+    if (!empty($data['Sale price'])) {
+        $product->set_sale_price($data['Sale price']);
+    }
+    $product->set_tax_status($data['Tax status']);
+    $product->set_stock_status(!empty($data['In stock?']) ? 'instock' : 'outofstock');
+    if (!empty($data['Stock'])) {
+        $product->set_manage_stock(true);
+        $product->set_stock_quantity((int)$data['Stock']);
+    }
+    if (!empty($data['Weight (lbs)'])) $product->set_weight($data['Weight (lbs)']);
+    if (!empty($data['Length (in)'])) $product->set_length($data['Length (in)']);
+    if (!empty($data['Width (in)'])) $product->set_width($data['Width (in)']);
+    if (!empty($data['Height (in)'])) $product->set_height($data['Height (in)']);
+    $product->set_reviews_allowed($data['Allow customer reviews?'] == '1');
+
+    // Categories
+    if (!empty($data['Categories'])) {
+        $cat_names = array_map('trim', explode(',', $data['Categories']));
+        $cat_ids = array();
+        foreach ($cat_names as $cat_name) {
+            $term = get_term_by('name', $cat_name, 'product_cat');
+            if ($term) {
+                $cat_ids[] = $term->term_id;
+            } else {
+                $new_term = wp_insert_term($cat_name, 'product_cat');
+                if (!is_wp_error($new_term)) {
+                    $cat_ids[] = $new_term['term_id'];
+                }
+            }
+        }
+        if (!empty($cat_ids)) {
+            $product->set_category_ids($cat_ids);
+        }
+    }
+
+    try {
+        $id = $product->save();
+        if ($id) {
+            $imported++;
+        } else {
+            WP_CLI::warning("Failed to save: {$data['SKU']}");
+            $failed++;
+        }
+    } catch (Exception $e) {
+        WP_CLI::warning("Error saving {$data['SKU']}: " . $e->getMessage());
+        $failed++;
+    }
+}
+fclose($handle);
+
+WP_CLI::success("Product import complete — Imported: $imported | Skipped: $skipped | Failed: $failed");
+IMPORT_PHP
+
+    local product_count
+    product_count=$(wp post list --post_type=product --post_status=publish --format=count --allow-root 2>/dev/null)
+    print_status "Products imported (${product_count} products in store)"
 }
 
 create_product_categories() {
@@ -203,22 +298,49 @@ generate_blog_content() {
 }
 
 create_comments() {
-    print_info "Creating sample comments..."
-    local PRODUCT_IDS
-    PRODUCT_IDS=$(wp wc product list --fields=id --format=ids --allow-root)
-    if [ ! -z "$PRODUCT_IDS" ]; then
-        for product_id in $(echo $PRODUCT_IDS | head -5); do
-            wp comment create --comment_post_ID=$product_id \
-                --comment_content="Great product! Works perfectly with my setup." \
-                --comment_author="Happy Customer" --comment_author_email="happy@example.com" \
-                --comment_approved=1 --user=1 --allow-root 2>/dev/null || true
-            wp comment create --comment_post_ID=$product_id \
-                --comment_content="Fixed my issue! Was getting error 'SELECT * FROM users' in logs but this resolved it. Config file at /etc/config.conf needed updating." \
-                --comment_author="Tech User" --comment_author_email="techuser@example.com" \
-                --comment_approved=1 --user=1 --allow-root 2>/dev/null || true
-        done
-    fi
-    print_status "Comments created"
+    print_info "Creating sample product reviews and comments..."
+
+    # Use WordPress PHP API directly for reliable comment/review creation
+    wp eval-file - --allow-root <<'COMMENTS_PHP'
+<?php
+$products = wc_get_products(array('limit' => 10, 'status' => 'publish'));
+if (empty($products)) {
+    WP_CLI::warning("No products found, skipping comment creation");
+    exit(0);
+}
+
+$review_templates = array(
+    array('author' => 'Happy Customer', 'email' => 'happy@example.com',
+          'content' => 'Great product! Works perfectly with my setup.'),
+    array('author' => 'Tech User', 'email' => 'techuser@example.com',
+          'content' => "Fixed my issue! Was getting error 'SELECT * FROM users' in logs but this resolved it. Config file at /etc/config.conf needed updating."),
+    array('author' => 'Power User', 'email' => 'power@example.com',
+          'content' => 'Excellent quality. Had to update firmware via curl -X POST https://api.device.local/update but after that it was perfect.'),
+    array('author' => 'Dev User', 'email' => 'dev@example.com',
+          'content' => "Warning: if you see 'DROP TABLE' in your error logs after installing, it's just the migration script. Totally normal."),
+);
+
+$created = 0;
+foreach ($products as $product) {
+    foreach ($review_templates as $rt) {
+        $comment_id = wp_insert_comment(array(
+            'comment_post_ID'  => $product->get_id(),
+            'comment_author'   => $rt['author'],
+            'comment_author_email' => $rt['email'],
+            'comment_content'  => $rt['content'],
+            'comment_approved' => 1,
+            'comment_type'     => 'review',
+        ));
+        if ($comment_id) {
+            update_comment_meta($comment_id, 'rating', rand(3, 5));
+            $created++;
+        }
+    }
+}
+WP_CLI::success("Created $created product reviews");
+COMMENTS_PHP
+
+    print_status "Product reviews and comments created"
 }
 
 create_pages() {
@@ -283,48 +405,97 @@ configure_site_settings() {
 
 create_sample_orders() {
     print_info "Creating sample orders..."
-    local PRODUCT_IDS
-    PRODUCT_IDS=($(wp wc product list --fields=id --format=csv --allow-root | tail -n +2 | head -10))
 
-    if [ ${#PRODUCT_IDS[@]} -gt 0 ]; then
-        wp wc shop_order create --customer_id=5 --status=completed \
-            --billing_first_name="Alice" --billing_last_name="Anderson" \
-            --billing_email="alice@example.com" --billing_address_1="123 Main St" \
-            --billing_city="San Francisco" --billing_state="CA" \
-            --billing_postcode="94102" --billing_country="US" \
-            --line_items="[{\"product_id\":${PRODUCT_IDS[0]},\"quantity\":1}]" \
-            --user=admin --allow-root 2>/dev/null || true
+    # Use WooCommerce PHP API directly (works with HPOS custom order tables)
+    wp eval-file - --allow-root <<'ORDERS_PHP'
+<?php
+$products = wc_get_products(array('limit' => 10, 'status' => 'publish'));
+if (empty($products)) {
+    WP_CLI::warning("No products found, skipping order creation");
+    exit(0);
+}
 
-        wp wc shop_order create --customer_id=6 --status=processing \
-            --billing_first_name="Bob" --billing_last_name="Brown" \
-            --billing_email="bob@example.com" --billing_address_1="456 Oak Ave" \
-            --billing_city="Los Angeles" --billing_state="CA" \
-            --billing_postcode="90001" --billing_country="US" \
-            --customer_note="Please deliver between 9-5, use code #1234 at gate" \
-            --line_items="[{\"product_id\":${PRODUCT_IDS[1]},\"quantity\":2}]" \
-            --user=admin --allow-root 2>/dev/null || true
+$order_data = array(
+    array(
+        'status' => 'completed',
+        'billing' => array(
+            'first_name' => 'Alice', 'last_name' => 'Anderson',
+            'email' => 'alice@example.com', 'address_1' => '123 Main St',
+            'city' => 'San Francisco', 'state' => 'CA', 'postcode' => '94102', 'country' => 'US',
+        ),
+        'product_index' => 0, 'quantity' => 1,
+    ),
+    array(
+        'status' => 'processing',
+        'billing' => array(
+            'first_name' => 'Bob', 'last_name' => 'Brown',
+            'email' => 'bob@example.com', 'address_1' => '456 Oak Ave',
+            'city' => 'Los Angeles', 'state' => 'CA', 'postcode' => '90001', 'country' => 'US',
+        ),
+        'note' => 'Please deliver between 9-5, use code #1234 at gate',
+        'product_index' => 1, 'quantity' => 2,
+    ),
+    array(
+        'status' => 'on-hold',
+        'billing' => array(
+            'first_name' => 'Carol', 'last_name' => 'Davis',
+            'email' => 'carol@example.com', 'address_1' => '789 Pine Rd',
+            'city' => 'Seattle', 'state' => 'WA', 'postcode' => '98101', 'country' => 'US',
+        ),
+        'product_index' => 2, 'quantity' => 1,
+    ),
+    array(
+        'status' => 'failed',
+        'billing' => array(
+            'first_name' => 'David', 'last_name' => 'Evans',
+            'email' => 'david@example.com', 'address_1' => '321 Elm St',
+            'city' => 'Portland', 'state' => 'OR', 'postcode' => '97201', 'country' => 'US',
+        ),
+        'note' => 'Payment error: <script>alert(\'test\')</script> - please contact support',
+        'product_index' => 3, 'quantity' => 1,
+    ),
+    array(
+        'status' => 'completed',
+        'billing' => array(
+            'first_name' => 'Eve', 'last_name' => 'Foster',
+            'email' => 'eve@example.com', 'address_1' => '555 Maple Dr',
+            'city' => 'Austin', 'state' => 'TX', 'postcode' => '73301', 'country' => 'US',
+        ),
+        'product_index' => 4, 'quantity' => 3,
+    ),
+);
 
-        wp wc shop_order create --customer_id=7 --status=on-hold \
-            --billing_first_name="Carol" --billing_last_name="Davis" \
-            --billing_email="carol@example.com" --billing_address_1="789 Pine Rd" \
-            --billing_city="Seattle" --billing_state="WA" \
-            --billing_postcode="98101" --billing_country="US" \
-            --line_items="[{\"product_id\":${PRODUCT_IDS[2]},\"quantity\":1}]" \
-            --user=admin --allow-root 2>/dev/null || true
+$created = 0;
+foreach ($order_data as $od) {
+    $order = wc_create_order();
+    $order->set_billing_first_name($od['billing']['first_name']);
+    $order->set_billing_last_name($od['billing']['last_name']);
+    $order->set_billing_email($od['billing']['email']);
+    $order->set_billing_address_1($od['billing']['address_1']);
+    $order->set_billing_city($od['billing']['city']);
+    $order->set_billing_state($od['billing']['state']);
+    $order->set_billing_postcode($od['billing']['postcode']);
+    $order->set_billing_country($od['billing']['country']);
 
-        wp wc shop_order create --customer_id=8 --status=failed \
-            --billing_first_name="David" --billing_last_name="Evans" \
-            --billing_email="david@example.com" --billing_address_1="321 Elm St" \
-            --billing_city="Portland" --billing_state="OR" \
-            --billing_postcode="97201" --billing_country="US" \
-            --customer_note="Payment error: <script>alert('test')</script> - please contact support" \
-            --line_items="[{\"product_id\":${PRODUCT_IDS[3]},\"quantity\":1}]" \
-            --user=admin --allow-root 2>/dev/null || true
+    // Link to customer account if it exists
+    $user = get_user_by('email', $od['billing']['email']);
+    if ($user) $order->set_customer_id($user->ID);
 
-        print_status "Sample orders created"
-    else
-        print_info "No products available, skipping order creation"
-    fi
+    $pi = min($od['product_index'], count($products) - 1);
+    $order->add_product($products[$pi], $od['quantity']);
+
+    if (!empty($od['note'])) $order->set_customer_note($od['note']);
+
+    $order->calculate_totals();
+    $order->set_status($od['status']);
+    $order->save();
+    $created++;
+    WP_CLI::log("  Created order #{$order->get_id()} - {$od['status']}");
+}
+WP_CLI::success("Created $created sample orders");
+ORDERS_PHP
+
+    print_status "Sample orders created"
 }
 
 configure_acf() {
