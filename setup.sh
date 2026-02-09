@@ -204,6 +204,7 @@ if [ ! -z "$PRODUCT_IDS" ]; then
             --comment_author="Happy Customer" \
             --comment_author_email="happy@example.com" \
             --comment_approved=1 \
+            --user=1 \
             --allow-root 2>/dev/null || true
         
         # Technical comment that might trigger WAF
@@ -212,6 +213,7 @@ if [ ! -z "$PRODUCT_IDS" ]; then
             --comment_author="Tech User" \
             --comment_author_email="techuser@example.com" \
             --comment_approved=1 \
+            --user=1 \
             --allow-root 2>/dev/null || true
     done
 fi
