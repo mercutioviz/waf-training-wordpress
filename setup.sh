@@ -78,9 +78,39 @@ wait_for_wordpress() {
 }
 
 configure_wordpress_constants() {
-    print_info "Configuring WordPress constants (dynamic host)..."
-    wp config set WP_HOME "'http://' . \$_SERVER['HTTP_HOST']" --raw --allow-root 2>/dev/null || true
-    wp config set WP_SITEURL "'http://' . \$_SERVER['HTTP_HOST']" --raw --allow-root 2>/dev/null || true
+    print_info "Configuring WordPress constants (dynamic host, protocol-aware)..."
+
+    # We need to inject a PHP block that detects the scheme and sets WP_HOME/WP_SITEURL.
+    # wp config set can't handle multi-line expressions, so we use a helper PHP script.
+    php -r "
+        \$file = '/var/www/html/wp-config.php';
+        \$content = file_get_contents(\$file);
+        \$marker = \"/* That's all, stop editing! Happy publishing. */\";
+
+        // Remove any existing WP_HOME/WP_SITEURL/FORCE_SSL_ADMIN/_wp_scheme lines
+        \$lines = explode(\"\\n\", \$content);
+        \$filtered = [];
+        foreach (\$lines as \$line) {
+            if (preg_match(\"/define\(\s*'WP_HOME'/\", \$line)) continue;
+            if (preg_match(\"/define\(\s*'WP_SITEURL'/\", \$line)) continue;
+            if (preg_match(\"/define\(\s*'FORCE_SSL_ADMIN'/\", \$line)) continue;
+            if (preg_match('/\\\$_wp_scheme/', \$line)) continue;
+            \$filtered[] = \$line;
+        }
+        \$content = implode(\"\\n\", \$filtered);
+        \$content = preg_replace('/\\n{3,}/', \"\\n\\n\", \$content);
+
+        // Insert protocol-aware constants before the stop-editing marker
+        \$block = \"\\\$_wp_scheme = (isset(\\\$_SERVER['HTTPS']) && \\\$_SERVER['HTTPS'] === 'on') ? 'https' : 'http';\\n\";
+        \$block .= \"define( 'WP_HOME', \\\$_wp_scheme . '://' . \\\$_SERVER['HTTP_HOST'] );\\n\";
+        \$block .= \"define( 'WP_SITEURL', \\\$_wp_scheme . '://' . \\\$_SERVER['HTTP_HOST'] );\\n\";
+        \$block .= \"define( 'FORCE_SSL_ADMIN', true );\\n\\n\";
+        \$content = str_replace(\$marker, \$block . \$marker, \$content);
+
+        file_put_contents(\$file, \$content);
+        echo 'WordPress constants configured in wp-config.php' . PHP_EOL;
+    "
+
     print_status "WordPress constants configured"
 }
 
