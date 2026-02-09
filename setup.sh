@@ -81,7 +81,7 @@ configure_wordpress_constants() {
     print_info "Configuring WordPress constants (dynamic host, protocol-aware)..."
 
     # We need to inject a PHP block that detects the scheme and sets WP_HOME/WP_SITEURL.
-    # wp config set can't handle multi-line expressions, so we use a helper PHP script.
+     #wp config set can't handle multi-line expressions, so we use a helper PHP script.
     php -r "
         \$file = '/var/www/html/wp-config.php';
         \$content = file_get_contents(\$file);
@@ -149,6 +149,14 @@ configure_woocommerce() {
     wp option update woocommerce_enable_reviews "yes" --allow-root
     wp option update woocommerce_enable_coupons "yes" --allow-root
     wp wc tool run install_pages --user=admin --allow-root
+
+    # Dismiss the WooCommerce setup wizard / onboarding nag
+    print_info "Dismissing WooCommerce setup wizard..."
+    wp option update woocommerce_onboarding_profile '{"completed":true}' --format=json --allow-root 2>/dev/null || true
+    wp option update woocommerce_task_list_complete "yes" --allow-root 2>/dev/null || true
+    wp option add woocommerce_task_list_hidden "yes" --allow-root 2>/dev/null || \
+        wp option update woocommerce_task_list_hidden "yes" --allow-root 2>/dev/null || true
+
     print_status "WooCommerce configured"
 }
 
