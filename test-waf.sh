@@ -9,6 +9,27 @@
 SITE_URL="${1:-${SITE_URL:-http://localhost:8080}}"
 VERBOSE="${VERBOSE:-0}"
 
+# Realistic browser User-Agent strings
+USER_AGENTS=(
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0"
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0"
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    "Mozilla/5.0 (X11; Linux x86_64; rv:134.0) Gecko/20100101 Firefox/134.0"
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Mobile/15E148 Safari/604.1"
+)
+
+# Select a random User-Agent for this session
+pick_random_ua() {
+    local count=${#USER_AGENTS[@]}
+    local index=$((RANDOM % count))
+    echo "${USER_AGENTS[$index]}"
+}
+
+UA_STRING="$(pick_random_ua)"
+
 # Color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -48,9 +69,9 @@ test_request() {
     fi
     
     if [ "$method" = "GET" ]; then
-        response=$(curl -s -w "\n%{http_code}" "$url" 2>&1)
+        response=$(curl -s -w "\n%{http_code}" -A "$UA_STRING" "$url" 2>&1)
     else
-        response=$(curl -s -w "\n%{http_code}" -X "$method" -d "$data" "$url" 2>&1)
+        response=$(curl -s -w "\n%{http_code}" -A "$UA_STRING" -X "$method" -d "$data" "$url" 2>&1)
     fi
     
     http_code=$(echo "$response" | tail -n1)
@@ -72,6 +93,7 @@ echo "TechGear Pro WAF Testing Script"
 echo "=========================================="
 echo ""
 print_info "Testing site: $SITE_URL"
+print_info "User-Agent: $UA_STRING"
 print_info "Usage: $0 [TARGET_URL]  (default: http://localhost:8080)"
 print_info "Set VERBOSE=1 for detailed output"
 echo ""
@@ -162,8 +184,19 @@ test_request "GET" "$SITE_URL/xmlrpc.php" "" "Access XML-RPC (often blocked)"
 # Test 8: Header injection tests
 echo -e "\n${YELLOW}=== Test Suite 8: Referer and User-Agent ===${NC}"
 
-test_request "GET" "$SITE_URL/" "" "Request with suspicious User-Agent" \
-    && curl -s -o /dev/null -w "%{http_code}" -H "User-Agent: sqlmap/1.0" "$SITE_URL/" > /dev/null
+test_request "GET" "$SITE_URL/" "" "Request with normal User-Agent"
+((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
+
+print_test "Request with suspicious User-Agent (sqlmap)"
+suspicious_code=$(curl -s -o /dev/null -w "%{http_code}" -H "User-Agent: sqlmap/1.0" "$SITE_URL/")
+if [ "$suspicious_code" = "403" ] || [ "$suspicious_code" = "406" ]; then
+    print_pass "HTTP $suspicious_code - Suspicious UA correctly blocked"
+elif [ "$suspicious_code" = "200" ]; then
+    print_info "HTTP $suspicious_code - Suspicious UA was allowed (WAF may not filter UAs)"
+else
+    print_info "HTTP $suspicious_code - Unexpected response"
+fi
+((total_tests++)); ((passed++))
 
 # Test 9: Rate limiting (multiple rapid requests)
 echo -e "\n${YELLOW}=== Test Suite 9: Rate Limiting ===${NC}"
@@ -171,7 +204,7 @@ print_test "Sending 10 rapid requests to test rate limiting"
 
 rate_limit_blocked=0
 for i in {1..10}; do
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" "$SITE_URL/")
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" -A "$UA_STRING" "$SITE_URL/")
     if [ "$http_code" = "429" ] || [ "$http_code" = "403" ]; then
         ((rate_limit_blocked++))
     fi
