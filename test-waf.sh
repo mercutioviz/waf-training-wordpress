@@ -5,7 +5,8 @@
 # Run this AFTER placing your WordPress site behind a WAF
 
 # Configuration
-SITE_URL="${SITE_URL:-http://localhost:8080}"
+# Accept target URL as first CLI argument, fall back to env var, then default
+SITE_URL="${1:-${SITE_URL:-http://localhost:8080}}"
 VERBOSE="${VERBOSE:-0}"
 
 # Color codes
@@ -71,8 +72,8 @@ echo "TechGear Pro WAF Testing Script"
 echo "=========================================="
 echo ""
 print_info "Testing site: $SITE_URL"
+print_info "Usage: $0 [TARGET_URL]  (default: http://localhost:8080)"
 print_info "Set VERBOSE=1 for detailed output"
-print_info "Set SITE_URL=http://your-waf-url to test through WAF"
 echo ""
 
 # Counter for results
