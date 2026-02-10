@@ -37,6 +37,17 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Counters
+total_tests=0
+passed=0
+blocked=0
+errors=0
+
+# Results tracking: parallel arrays
+declare -a RESULT_DESCRIPTIONS=()
+declare -a RESULT_CODES=()
+declare -a RESULT_STATUSES=()
+
 # Function to print colored output
 print_test() {
     echo -e "${BLUE}[TEST]${NC} $1"
@@ -54,37 +65,57 @@ print_info() {
     echo -e "${YELLOW}[INFO]${NC} $1"
 }
 
-# Function to make request and check response
+# Record a test result and update counters
+# Usage: record_result "description" "http_code" "status"
+#   status: PASS, BLOCKED, or INFO
+record_result() {
+    local description="$1"
+    local http_code="$2"
+    local status="$3"
+
+    RESULT_DESCRIPTIONS+=("$description")
+    RESULT_CODES+=("$http_code")
+    RESULT_STATUSES+=("$status")
+
+    ((total_tests++))
+    case "$status" in
+        PASS)    ((passed++)) ;;
+        BLOCKED) ((blocked++)) ;;
+        *)       ((errors++)) ;;
+    esac
+}
+
+# Function to make request, check response, and record result
 test_request() {
     local method=$1
     local url=$2
     local data=$3
     local description=$4
-    
+
     print_test "$description"
-    
+
     if [ "$VERBOSE" = "1" ]; then
         echo "  URL: $url"
         [ ! -z "$data" ] && echo "  Data: $data"
     fi
-    
+
     if [ "$method" = "GET" ]; then
         response=$(curl -s -w "\n%{http_code}" -A "$UA_STRING" "$url" 2>&1)
     else
         response=$(curl -s -w "\n%{http_code}" -A "$UA_STRING" -X "$method" -d "$data" "$url" 2>&1)
     fi
-    
+
     http_code=$(echo "$response" | tail -n1)
-    
+
     if [ "$http_code" = "200" ] || [ "$http_code" = "301" ] || [ "$http_code" = "302" ]; then
         print_pass "HTTP $http_code - Request succeeded"
-        return 0
+        record_result "$description" "$http_code" "PASS"
     elif [ "$http_code" = "403" ] || [ "$http_code" = "406" ]; then
         print_fail "HTTP $http_code - WAF BLOCKED (Potential False Positive)"
-        return 1
+        record_result "$description" "$http_code" "BLOCKED"
     else
         print_info "HTTP $http_code - Unexpected response"
-        return 2
+        record_result "$description" "$http_code" "INFO"
     fi
 }
 
@@ -98,107 +129,64 @@ print_info "Usage: $0 [TARGET_URL]  (default: http://localhost:8080)"
 print_info "Set VERBOSE=1 for detailed output"
 echo ""
 
-# Counter for results
-total_tests=0
-passed=0
-blocked=0
-errors=0
-
-# Test 1: Basic site access
+# ── Test Suite 1: Basic Access ───────────────────────────────────────
 echo -e "\n${YELLOW}=== Test Suite 1: Basic Access ===${NC}"
 test_request "GET" "$SITE_URL/" "" "Homepage access"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
-
 test_request "GET" "$SITE_URL/shop/" "" "Shop page access"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
 
-# Test 2: Product searches with special characters (SQLi false positives)
+# ── Test Suite 2: Product Search (SQLi False Positives) ──────────────
 echo -e "\n${YELLOW}=== Test Suite 2: Product Search (SQLi False Positives) ===${NC}"
-
 test_request "GET" "$SITE_URL/?s=O%27Reilly" "" "Search: O'Reilly (apostrophe)"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
-
 test_request "GET" "$SITE_URL/?s=15%22+MacBook" "" "Search: 15\" MacBook (quotes)"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
-
 test_request "GET" "$SITE_URL/?s=USB-C+to+USB-A" "" "Search: USB-C to USB-A (hyphens)"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
-
 test_request "GET" "$SITE_URL/?s=SELECT+*+FROM+products" "" "Search: SELECT * FROM products (SQL-like)"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
-
 test_request "GET" "$SITE_URL/?s=price%3E100" "" "Search: price>100 (comparison operator)"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
 
-# Test 3: Product filters (parameter injection false positives)
+# ── Test Suite 3: Product Filters ────────────────────────────────────
 echo -e "\n${YELLOW}=== Test Suite 3: Product Filters ===${NC}"
-
 test_request "GET" "$SITE_URL/shop/?min_price=50&max_price=200" "" "Price filter"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
-
 test_request "GET" "$SITE_URL/shop/?orderby=price&order=asc" "" "Sort by price"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
-
 test_request "GET" "$SITE_URL/shop/?product_cat=laptops" "" "Category filter"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
 
-# Test 4: WordPress REST API (might trigger rate limiting)
+# ── Test Suite 4: REST API Access ────────────────────────────────────
 echo -e "\n${YELLOW}=== Test Suite 4: REST API Access ===${NC}"
-
 test_request "GET" "$SITE_URL/wp-json/wp/v2/posts" "" "Get posts via REST API"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
-
 test_request "GET" "$SITE_URL/wp-json/wc/v3/products" "" "Get products via WooCommerce API"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
 
-# Test 5: Path-based requests (path traversal false positives)
+# ── Test Suite 5: Static Resources ───────────────────────────────────
 echo -e "\n${YELLOW}=== Test Suite 5: Static Resources ===${NC}"
-
 test_request "GET" "$SITE_URL/wp-content/plugins/woocommerce/readme.txt" "" "Access plugin readme"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
-
 test_request "GET" "$SITE_URL/wp-includes/js/jquery/jquery.min.js" "" "Access jQuery library"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
 
-# Test 6: User registration (if enabled)
+# ── Test Suite 6: User Interaction ───────────────────────────────────
 echo -e "\n${YELLOW}=== Test Suite 6: User Interaction ===${NC}"
-
 test_request "GET" "$SITE_URL/my-account/" "" "Access customer account page"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
-
 test_request "GET" "$SITE_URL/cart/" "" "Access shopping cart"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
-
 test_request "GET" "$SITE_URL/checkout/" "" "Access checkout page"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
 
-# Test 7: Common WordPress paths
+# ── Test Suite 7: WordPress Endpoints ────────────────────────────────
 echo -e "\n${YELLOW}=== Test Suite 7: WordPress Endpoints ===${NC}"
-
 test_request "GET" "$SITE_URL/wp-login.php" "" "Access login page"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
-
 test_request "GET" "$SITE_URL/xmlrpc.php" "" "Access XML-RPC (often blocked)"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
 
-# Test 8: Header injection tests
-echo -e "\n${YELLOW}=== Test Suite 8: Referer and User-Agent ===${NC}"
-
+# ── Test Suite 8: User-Agent Tests ───────────────────────────────────
+echo -e "\n${YELLOW}=== Test Suite 8: User-Agent Tests ===${NC}"
 test_request "GET" "$SITE_URL/" "" "Request with normal User-Agent"
-((total_tests++)); [ $? -eq 0 ] && ((passed++)) || [ $? -eq 1 ] && ((blocked++)) || ((errors++))
 
 print_test "Request with suspicious User-Agent (sqlmap)"
 suspicious_code=$(curl -s -o /dev/null -w "%{http_code}" -H "User-Agent: sqlmap/1.0" "$SITE_URL/")
 if [ "$suspicious_code" = "403" ] || [ "$suspicious_code" = "406" ]; then
     print_pass "HTTP $suspicious_code - Suspicious UA correctly blocked"
+    record_result "Suspicious UA (sqlmap) - expected block" "$suspicious_code" "PASS"
 elif [ "$suspicious_code" = "200" ]; then
     print_info "HTTP $suspicious_code - Suspicious UA was allowed (WAF may not filter UAs)"
+    record_result "Suspicious UA (sqlmap) - not blocked" "$suspicious_code" "INFO"
 else
     print_info "HTTP $suspicious_code - Unexpected response"
+    record_result "Suspicious UA (sqlmap) - unexpected" "$suspicious_code" "INFO"
 fi
-((total_tests++)); ((passed++))
 
-# Test 9: Rate limiting (multiple rapid requests)
+# ── Test Suite 9: Rate Limiting ──────────────────────────────────────
 echo -e "\n${YELLOW}=== Test Suite 9: Rate Limiting ===${NC}"
 print_test "Sending 10 rapid requests to test rate limiting"
 
@@ -213,13 +201,13 @@ done
 
 if [ $rate_limit_blocked -gt 0 ]; then
     print_fail "$rate_limit_blocked/10 requests blocked by rate limiting"
+    record_result "Rate limiting (10 rapid requests)" "$rate_limit_blocked/10 blocked" "BLOCKED"
 else
     print_pass "All 10 rapid requests succeeded (no rate limiting triggered)"
+    record_result "Rate limiting (10 rapid requests)" "all 200" "PASS"
 fi
-((total_tests++))
-[ $rate_limit_blocked -eq 0 ] && ((passed++)) || ((blocked++))
 
-# Summary
+# ── Summary ──────────────────────────────────────────────────────────
 echo ""
 echo "=========================================="
 echo "Test Summary"
@@ -227,16 +215,40 @@ echo "=========================================="
 echo -e "Total Tests:    ${BLUE}$total_tests${NC}"
 echo -e "Passed:         ${GREEN}$passed${NC}"
 echo -e "Blocked (FP):   ${RED}$blocked${NC}"
-echo -e "Errors:         ${YELLOW}$errors${NC}"
+echo -e "Other/Info:     ${YELLOW}$errors${NC}"
 echo ""
 
+# ── Detailed Results Table ───────────────────────────────────────────
+printf "%-55s %-8s %-10s\n" "TEST" "HTTP" "STATUS"
+printf "%-55s %-8s %-10s\n" "$(printf '%0.s─' {1..55})" "$(printf '%0.s─' {1..8})" "$(printf '%0.s─' {1..10})"
+
+for i in "${!RESULT_DESCRIPTIONS[@]}"; do
+    desc="${RESULT_DESCRIPTIONS[$i]}"
+    code="${RESULT_CODES[$i]}"
+    status="${RESULT_STATUSES[$i]}"
+
+    # Truncate long descriptions
+    if [ ${#desc} -gt 53 ]; then
+        desc="${desc:0:50}..."
+    fi
+
+    case "$status" in
+        PASS)    color="$GREEN" ;;
+        BLOCKED) color="$RED" ;;
+        *)       color="$YELLOW" ;;
+    esac
+
+    printf "%-55s %-8s ${color}%-10s${NC}\n" "$desc" "$code" "$status"
+done
+
+echo ""
 if [ $blocked -gt 0 ]; then
-    echo -e "${YELLOW}⚠️  Found $blocked potential false positives!${NC}"
+    echo -e "${YELLOW}⚠️  Found $blocked potential false positive(s)!${NC}"
     echo "Review your WAF logs to tune rules for these legitimate requests."
 elif [ $passed -eq $total_tests ]; then
     echo -e "${GREEN}✓ All tests passed! No false positives detected.${NC}"
 else
-    echo -e "${YELLOW}⚠️  Some tests had unexpected results.${NC}"
+    echo -e "${YELLOW}ℹ️  $errors test(s) returned unexpected status codes (not blocked, see details above).${NC}"
 fi
 
 echo ""
