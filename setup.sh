@@ -272,89 +272,89 @@ add_product_images() {
     # Map: sku|filename|unsplash_photo_url
     local PRODUCT_IMAGE_MAP=(
         # Laptops
-        "LAPTOP-MBP15|macbook-pro|https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&q=80"
-        "LAPTOP-XPS13|dell-xps-13|https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=800&q=80"
-        "LAPTOP-X1C9|thinkpad-x1-carbon|https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=800&q=80"
+        "LAPTOP-001|macbook-pro|https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&q=80"
+        "LAPTOP-002|dell-xps-13|https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=800&q=80"
+        "LAPTOP-003|thinkpad-x1-carbon|https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=800&q=80"
 
         # Mice
-        "MOUSE-ORLY|gaming-mouse|https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=800&q=80"
-        "MOUSE-MX3S|logitech-mx-master|https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=800&q=80"
+        "MOUSE-001|gaming-mouse|https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=800&q=80"
+        "MOUSE-002|logitech-mx-master|https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=800&q=80"
 
         # Cables & Adapters
-        "ADAPT-UC2A3|usb-c-adapter|https://images.unsplash.com/photo-1625842268584-8f3296236761?w=800&q=80"
-        "CABLE-TB4-2M|thunderbolt-cable|https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=800&q=80"
-        "CABLE-HDMI21|hdmi-cable|https://images.unsplash.com/photo-1605236453806-6ff36851218e?w=800&q=80"
-        "CABLE-DP14|displayport-cable|https://images.unsplash.com/photo-1625842268584-8f3296236761?w=800&q=80"
-        "ADAPT-UC2H4K|usb-c-hdmi-adapter|https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=800&q=80"
+        "CABLE-001|usb-c-adapter|https://images.unsplash.com/photo-1625842268584-8f3296236761?w=800&q=80"
+        "CABLE-002|thunderbolt-cable|https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=800&q=80"
+        "CABLE-003|hdmi-cable|https://images.unsplash.com/photo-1605236453806-6ff36851218e?w=800&q=80"
+        "CABLE-004|displayport-cable|https://images.unsplash.com/photo-1625842268584-8f3296236761?w=800&q=80"
+        "ADAPTER-001|usb-c-hdmi-adapter|https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=800&q=80"
 
         # Hubs & Docks
-        "HUB-USB7P|usb-hub|https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?w=800&q=80"
-        "DOCK-UC2K|docking-station|https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?w=800&q=80"
+        "HUB-001|usb-hub|https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?w=800&q=80"
+        "DOCK-001|docking-station|https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?w=800&q=80"
 
         # Keyboards
-        "KB-MXBLUE|mechanical-keyboard|https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?w=800&q=80"
-        "KB-K8WL|keychron-k8|https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=800&q=80"
+        "KEYBOARD-001|mechanical-keyboard|https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?w=800&q=80"
+        "KEYBOARD-002|keychron-k8|https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=800&q=80"
 
         # Monitors
-        "MON-27-4K|4k-ips-monitor|https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800&q=80"
-        "MON-34UW|ultrawide-gaming-monitor|https://images.unsplash.com/photo-1593640408182-31c70c8268f5?w=800&q=80"
+        "MONITOR-001|4k-ips-monitor|https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800&q=80"
+        "MONITOR-002|ultrawide-gaming-monitor|https://images.unsplash.com/photo-1593640408182-31c70c8268f5?w=800&q=80"
 
         # Webcam & Microphone
-        "CAM-4KAF|4k-webcam|https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=800&q=80"
-        "MIC-UCOND|usb-condenser-mic|https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=800&q=80"
+        "WEBCAM-001|4k-webcam|https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=800&q=80"
+        "MIC-001|usb-condenser-mic|https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=800&q=80"
 
         # Headset
-        "HS-WLANC|noise-canceling-headset|https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80"
+        "HEADSET-001|noise-canceling-headset|https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80"
 
         # Tablets
-        "TAB-IPAD12|ipad-pro|https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=800&q=80"
-        "TAB-AND11|android-tablet|https://images.unsplash.com/photo-1561154464-82e9adf32764?w=800&q=80"
+        "TABLET-001|ipad-pro|https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=800&q=80"
+        "TABLET-002|android-tablet|https://images.unsplash.com/photo-1561154464-82e9adf32764?w=800&q=80"
 
         # Stylus
-        "PEN-SURF|surface-pen|https://images.unsplash.com/photo-1585790050230-5dd28404ccb9?w=800&q=80"
+        "STYLUS-001|surface-pen|https://images.unsplash.com/photo-1585790050230-5dd28404ccb9?w=800&q=80"
 
         # Chargers
-        "CHG-65GAN|gan-usb-c-charger|https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800&q=80"
-        "CHG-100W2C|dual-usb-c-charger|https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=800&q=80"
+        "CHARGER-001|gan-usb-c-charger|https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800&q=80"
+        "CHARGER-002|dual-usb-c-charger|https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=800&q=80"
 
         # Power Bank
-        "PWR-20KPD|power-bank|https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=800&q=80"
+        "BATTERY-001|power-bank|https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=800&q=80"
 
         # Smart Home
-        "SH-BULB4|smart-led-bulbs|https://images.unsplash.com/photo-1558089687-f282ffcbc126?w=800&q=80"
-        "SH-PLUG2|smart-plug|https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=800&q=80"
-        "SH-THERM|smart-thermostat|https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=800&q=80"
+        "SMARTHOME-001|smart-led-bulbs|https://images.unsplash.com/photo-1558089687-f282ffcbc126?w=800&q=80"
+        "SMARTHOME-002|smart-plug|https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=800&q=80"
+        "SMARTHOME-003|smart-thermostat|https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=800&q=80"
 
         # Networking
-        "NET-MESH3|mesh-router|https://images.unsplash.com/photo-1606904825846-647eb07f5be2?w=800&q=80"
-        "NET-SW8G|ethernet-switch|https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=80"
+        "ROUTER-001|mesh-router|https://images.unsplash.com/photo-1606904825846-647eb07f5be2?w=800&q=80"
+        "SWITCH-001|ethernet-switch|https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=80"
 
         # Storage
-        "NAS-2BAY|nas-storage|https://images.unsplash.com/photo-1597852074816-d933c7d2b988?w=800&q=80"
-        "SSD-1TNVM|nvme-ssd|https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=800&q=80"
-        "SSD-2TPORT|portable-ssd|https://images.unsplash.com/photo-1531492746076-161ca9bcad58?w=800&q=80"
+        "NAS-001|nas-storage|https://images.unsplash.com/photo-1597852074816-d933c7d2b988?w=800&q=80"
+        "SSD-001|nvme-ssd|https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=800&q=80"
+        "SSD-002|portable-ssd|https://images.unsplash.com/photo-1531492746076-161ca9bcad58?w=800&q=80"
 
         # Accessories
-        "BAG-TECH1|tech-backpack|https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&q=80"
-        "STAND-ALU|laptop-stand|https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=800&q=80"
-        "LAMP-LEDWC|led-desk-lamp|https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?w=800&q=80"
-        "CLEAN-SCR|screen-cleaning-kit|https://images.unsplash.com/photo-1563206767-5b18f218e8de?w=800&q=80"
-        "SPK-BTWP|bluetooth-speaker|https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=800&q=80"
-        "LIGHT-RING|ring-light|https://images.unsplash.com/photo-1598550476439-6847785fcea6?w=800&q=80"
-        "TAB-EREADER|e-reader|https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&q=80"
+        "BACKPACK-001|tech-backpack|https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&q=80"
+        "STAND-001|laptop-stand|https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=800&q=80"
+        "LIGHT-001|led-desk-lamp|https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?w=800&q=80"
+        "CLEANER-001|screen-cleaning-kit|https://images.unsplash.com/photo-1563206767-5b18f218e8de?w=800&q=80"
+        "SPEAKER-001|bluetooth-speaker|https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=800&q=80"
+        "RING-001|ring-light|https://images.unsplash.com/photo-1598550476439-6847785fcea6?w=800&q=80"
+        "EREADER-001|e-reader|https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&q=80"
 
         # Gaming
-        "CTRL-WLPC|wireless-controller|https://images.unsplash.com/photo-1592840496694-26d035b52b48?w=800&q=80"
+        "GAMEPAD-001|wireless-controller|https://images.unsplash.com/photo-1592840496694-26d035b52b48?w=800&q=80"
 
         # PC Components
-        "RAM-32D5|ddr5-ram|https://images.unsplash.com/photo-1562976540-1502c2145186?w=800&q=80"
-        "PSU-850M|modular-psu|https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=800&q=80"
-        "CASE-MATX|atx-case|https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=800&q=80"
-        "COOL-240A|aio-liquid-cooler|https://images.unsplash.com/photo-1591488320449-011701bb6704?w=800&q=80"
-        "FAN-RGB3|rgb-case-fans|https://images.unsplash.com/photo-1591488320449-011701bb6704?w=800&q=80"
-        "THP-PERF|thermal-paste|https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80"
-        "TOOL-PCKIT|pc-toolkit|https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&q=80"
-        "GPU-4070|rtx-4070-gpu|https://images.unsplash.com/photo-1591488320449-011701bb6704?w=800&q=80"
+        "RAM-001|ddr5-ram|https://images.unsplash.com/photo-1562976540-1502c2145186?w=800&q=80"
+        "PSU-001|modular-psu|https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=800&q=80"
+        "CASE-001|atx-case|https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=800&q=80"
+        "COOLER-001|aio-liquid-cooler|https://images.unsplash.com/photo-1591488320449-011701bb6704?w=800&q=80"
+        "FAN-001|rgb-case-fans|https://images.unsplash.com/photo-1591488320449-011701bb6704?w=800&q=80"
+        "THERMAL-001|thermal-paste|https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80"
+        "TOOL-001|pc-toolkit|https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&q=80"
+        "GPU-001|rtx-4070-gpu|https://images.unsplash.com/photo-1591488320449-011701bb6704?w=800&q=80"
     )
 
     local imported=0
