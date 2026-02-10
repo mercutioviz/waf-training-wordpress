@@ -291,10 +291,123 @@ create_users() {
     print_status "Users created"
 }
 
-generate_blog_content() {
-    print_info "Generating blog content..."
-    wp faker post generate 15 --allow-root 2>/dev/null || print_info "Blog posts generation completed"
-    print_status "Blog content created"
+create_blog_posts() {
+    print_info "Creating blog posts..."
+
+    wp eval-file - --allow-root <<'BLOG_PHP'
+<?php
+$admin_id = get_user_by('login', 'admin')->ID;
+
+$posts = array(
+    array(
+        'title' => 'Top 10 Must-Have Tech Accessories for 2026',
+        'content' => '<p>As we kick off 2026, the tech accessory landscape is more exciting than ever. Here are our top picks.</p>
+<h3>1. USB-C Docking Stations</h3>
+<p>With more laptops going thin and light, a quality USB-C docking station is essential. Our TechDock Ultra provides 3 USB-A ports, 2 USB-C ports, HDMI 2.1, and ethernet.</p>
+<h3>2. Wireless Charging Pads</h3>
+<p>Fast wireless charging has become mainstream. Look for Qi2 compatible chargers that deliver up to 15W of power.</p>
+<h3>3. Smart Home Hubs</h3>
+<p>The new generation of smart home hubs supports Matter, Thread, and Zigbee protocols out of the box.</p>
+<p>Check out our full <a href="/shop/">product catalog</a> for more recommendations.</p>',
+        'excerpt' => 'Our curated list of the best tech accessories to upgrade your setup in 2026.',
+        'cats' => array('Technology', 'Reviews'),
+    ),
+    array(
+        'title' => 'Understanding Web Application Firewalls: A Beginner Guide',
+        'content' => '<p>Web Application Firewalls (WAFs) are critical security tools that protect web applications from common attacks like SQL injection and cross-site scripting (XSS).</p>
+<h3>What is a WAF?</h3>
+<p>A WAF sits between your web application and the internet, inspecting HTTP/HTTPS traffic and filtering out malicious requests.</p>
+<h3>Common WAF Challenges</h3>
+<p>One of the biggest challenges with WAFs is <strong>false positives</strong> - legitimate traffic that gets incorrectly flagged as malicious. For example, a customer searching for a product with an apostrophe in its name might trigger a SQL injection rule.</p>
+<h3>WAF Training Best Practices</h3>
+<p>This is exactly why WAF training environments like this one exist. By simulating real-world e-commerce traffic, security teams can learn to distinguish false positives from genuine attacks.</p>',
+        'excerpt' => 'Learn the basics of Web Application Firewalls, common challenges with false positives, and how to train your WAF.',
+        'cats' => array('Security', 'Technology'),
+    ),
+    array(
+        'title' => 'New Product Launch: UltraBook Pro X1',
+        'content' => '<p>We are thrilled to announce the arrival of the <strong>UltraBook Pro X1</strong> - our most powerful laptop yet.</p>
+<h3>Key Specifications</h3>
+<ul>
+<li><strong>Processor:</strong> Latest-gen 16-core CPU with 24 threads</li>
+<li><strong>Memory:</strong> 32GB DDR5 RAM (expandable to 64GB)</li>
+<li><strong>Storage:</strong> 1TB NVMe PCIe 5.0 SSD</li>
+<li><strong>Display:</strong> 15.6 inch 4K OLED, 120Hz</li>
+<li><strong>Battery:</strong> 99.5Wh with USB-C PD 140W fast charging</li>
+</ul>
+<p><strong>Available now in our <a href="/shop/">online store</a> starting at $1,899.</strong></p>',
+        'excerpt' => 'Introducing the UltraBook Pro X1 with 16-core CPU, 4K OLED display, and all-day battery life.',
+        'cats' => array('Product News'),
+    ),
+    array(
+        'title' => 'How to Set Up Your Smart Home in 5 Easy Steps',
+        'content' => '<p>Setting up a smart home might seem daunting, but with the right gear and a little planning, you can automate your home in an afternoon.</p>
+<h3>Step 1: Choose Your Ecosystem</h3>
+<p>We recommend starting with a Matter-compatible hub, as it works with devices from all major manufacturers.</p>
+<h3>Step 2: Start with Lighting</h3>
+<p>Smart bulbs are the easiest entry point. Our SmartBulb RGB Pack includes 4 color-changing bulbs that work right out of the box.</p>
+<h3>Step 3: Add a Smart Speaker</h3>
+<p>Voice control makes smart home management effortless.</p>
+<h3>Step 4: Smart Plugs for Legacy Devices</h3>
+<p>You do not need to replace every appliance. Smart plugs let you add connectivity to lamps, fans, and coffee makers.</p>
+<h3>Step 5: Set Up Automations</h3>
+<p>The real magic of a smart home is automation. Set your lights to turn on at sunset, your thermostat to lower at bedtime, and your coffee maker to start when your morning alarm goes off.</p>',
+        'excerpt' => 'A practical step-by-step guide to automating your home with smart devices.',
+        'cats' => array('Technology', 'Guides'),
+    ),
+    array(
+        'title' => 'Cybersecurity Tips for Online Shoppers',
+        'content' => '<p>Online shopping is convenient, but it comes with risks. Here are our top tips for staying safe.</p>
+<h3>Use Strong Unique Passwords</h3>
+<p>Never reuse passwords across sites. Use a password manager to generate and store complex passwords.</p>
+<h3>Look for HTTPS</h3>
+<p>Always check for the padlock icon and https:// in the URL before entering payment information.</p>
+<h3>Be Wary of Phishing</h3>
+<p>Legitimate companies will never ask for your password via email. If an email seems suspicious, go directly to the website rather than clicking links.</p>
+<h3>Use Two-Factor Authentication</h3>
+<p>Enable 2FA on all your accounts. Even if your password is compromised, 2FA adds an extra layer of protection.</p>
+<h3>Monitor Your Statements</h3>
+<p>Regularly check your credit card and bank statements for unauthorized charges. Report anything suspicious immediately.</p>',
+        'excerpt' => 'Essential cybersecurity tips to protect yourself while shopping online.',
+        'cats' => array('Security', 'Guides'),
+    ),
+);
+
+$created = 0;
+foreach ($posts as $p) {
+    $existing = get_page_by_title($p['title'], OBJECT, 'post');
+    if ($existing) {
+        WP_CLI::log("  Skipped (exists): {$p['title']}");
+        continue;
+    }
+    $cat_ids = array();
+    foreach ($p['cats'] as $cat_name) {
+        $term = get_term_by('name', $cat_name, 'category');
+        if (!$term) {
+            $new = wp_insert_term($cat_name, 'category');
+            if (!is_wp_error($new)) $cat_ids[] = $new['term_id'];
+        } else {
+            $cat_ids[] = $term->term_id;
+        }
+    }
+    $post_id = wp_insert_post(array(
+        'post_title'    => $p['title'],
+        'post_content'  => $p['content'],
+        'post_excerpt'  => $p['excerpt'],
+        'post_status'   => 'publish',
+        'post_type'     => 'post',
+        'post_author'   => $admin_id,
+        'post_category' => $cat_ids,
+    ));
+    if ($post_id && !is_wp_error($post_id)) {
+        $created++;
+        WP_CLI::log("  Created: {$p['title']} (ID: $post_id)");
+    }
+}
+WP_CLI::success("Blog posts done — Created: $created");
+BLOG_PHP
+
+    print_status "Blog posts created"
 }
 
 create_comments() {
@@ -345,11 +458,118 @@ COMMENTS_PHP
 
 create_pages() {
     print_info "Creating standard pages..."
-    wp post create --post_type=page --post_title="About Us" --post_content="<h2>About TechGear Pro</h2><p>We're passionate about technology and committed to providing the best tech products at competitive prices. Founded in 2020, we've grown to serve thousands of customers worldwide.</p><p>Our mission: Make cutting-edge technology accessible to everyone.</p>" --post_status=publish --allow-root
-    wp post create --post_type=page --post_title="FAQ" --post_content="<h2>Frequently Asked Questions</h2><h3>What's your return policy?</h3><p>30-day money-back guarantee on all products.</p><h3>Do you ship internationally?</h3><p>Yes! We ship to over 50 countries.</p><h3>How do I track my order?</h3><p>You'll receive a tracking link via email once your order ships.</p>" --post_status=publish --allow-root
-    wp post create --post_type=page --post_title="Contact" --post_content="<h2>Get in Touch</h2><p>Have questions? We're here to help!</p>" --post_status=publish --allow-root
-    wp post create --post_type=page --post_title="Returns & Refunds" --post_content="<h2>Returns Policy</h2><p>We accept returns within 30 days of purchase. Items must be in original condition with all packaging and accessories.</p><h3>Refund Process</h3><p>Refunds are processed within 5-7 business days after we receive your return.</p>" --post_status=publish --allow-root
-    wp post create --post_type=page --post_title="Privacy Policy" --post_content="<h2>Privacy Policy</h2><p>We collect and process personal data including: name, email, shipping address, and payment information. We use industry-standard encryption (TLS 1.3) to protect your data.</p><p>We never sell your personal information to third parties.</p>" --post_status=publish --allow-root
+
+    # Use PHP API to create pages idempotently (skip if slug already exists)
+    wp eval-file - --allow-root <<'PAGES_PHP'
+<?php
+$pages = array(
+    array(
+        'slug' => 'about-us',
+        'title' => 'About Us',
+        'content' => '<h2>About TechGear Pro</h2>
+<p>We are passionate about technology and committed to providing the best tech products at competitive prices. Founded in 2020, we have grown to serve thousands of customers worldwide.</p>
+<p>Our mission: Make cutting-edge technology accessible to everyone.</p>',
+    ),
+    array(
+        'slug' => 'faq',
+        'title' => 'FAQ',
+        'content' => '<h2>Frequently Asked Questions</h2>
+<h3>Orders and Shipping</h3>
+<p><strong>How long does shipping take?</strong><br>Standard shipping takes 5-7 business days within the US. Express shipping (2-3 days) and overnight options are available at checkout.</p>
+<p><strong>Do you ship internationally?</strong><br>Yes! We ship to over 50 countries worldwide. International shipping typically takes 7-14 business days.</p>
+<p><strong>How do I track my order?</strong><br>Once your order ships, you will receive a tracking link via email. You can also check your order status in your <a href="/my-account/">account dashboard</a>.</p>
+<h3>Returns and Refunds</h3>
+<p><strong>What is your return policy?</strong><br>We offer a 30-day money-back guarantee on all products. Items must be in original condition with all packaging.</p>
+<p><strong>How do I start a return?</strong><br>Log into your account, go to your orders, and click Request Return. You can also <a href="/contact/">contact our support team</a>.</p>
+<h3>Products and Technical Support</h3>
+<p><strong>Are your products covered by warranty?</strong><br>All products come with the manufacturer warranty. We also offer extended protection plans on select items.</p>
+<p><strong>I am having trouble with a product. What should I do?</strong><br>Check the product documentation first. If you still need help, <a href="/contact/">submit a support request</a> with your order number and a description of the issue.</p>
+<h3>Account and Security</h3>
+<p><strong>How do I create an account?</strong><br>Click <a href="/my-account/">My Account</a> and fill out the registration form.</p>
+<p><strong>Is my payment information secure?</strong><br>Absolutely. We use industry-standard TLS 1.3 encryption and never store full credit card details on our servers.</p>',
+    ),
+    array(
+        'slug' => 'contact',
+        'title' => 'Contact',
+        'content' => '<h2>Get in Touch</h2>
+<p>Have questions about our products? Need technical support? We are here to help! Fill out the form below and our team will get back to you within 24 hours.</p>
+[contact-form-7 id="10" title="Contact form 1"]
+<h3>Other Ways to Reach Us</h3>
+<p><strong>Email:</strong> support@techgearpro.local<br><strong>Phone:</strong> (555) 123-4567<br><strong>Hours:</strong> Monday - Friday, 9:00 AM - 6:00 PM PST</p>
+<p><strong>Address:</strong><br>TechGear Pro<br>123 Tech Street<br>San Francisco, CA 94102</p>',
+    ),
+    array(
+        'slug' => 'returns-refunds',
+        'title' => 'Returns & Refunds',
+        'content' => '<h2>Returns Policy</h2>
+<p>We accept returns within 30 days of purchase. Items must be in original condition with all packaging and accessories.</p>
+<h3>Refund Process</h3>
+<p>Refunds are processed within 5-7 business days after we receive your return.</p>',
+    ),
+    array(
+        'slug' => 'privacy-policy-2',
+        'title' => 'Privacy Policy',
+        'content' => '<h2>Privacy Policy</h2>
+<p>We collect and process personal data including: name, email, shipping address, and payment information. We use industry-standard encryption (TLS 1.3) to protect your data.</p>
+<p>We never sell your personal information to third parties.</p>',
+    ),
+    array(
+        'slug' => 'blog',
+        'title' => 'Blog',
+        'content' => '',
+    ),
+    array(
+        'slug' => 'events',
+        'title' => 'Events',
+        'content' => '<h2>Upcoming Events</h2>
+<p>Stay updated with TechGear Pro events, product launches, and community meetups.</p>
+<h3>CES 2026 - TechGear Pro Booth</h3>
+<p><strong>Date:</strong> January 7-10, 2026<br><strong>Location:</strong> Las Vegas Convention Center, Booth #4420<br>Visit us at CES to see our latest product lineup including the new UltraBook Pro X1 and SmartHome Hub Max.</p>
+<h3>WAF Training Workshop</h3>
+<p><strong>Date:</strong> March 15, 2026<br><strong>Location:</strong> Online (Zoom)<br>Learn how to configure and train your Web Application Firewall to minimize false positives while maintaining strong security.</p>
+<h3>TechGear Community Hackathon</h3>
+<p><strong>Date:</strong> April 22-23, 2026<br><strong>Location:</strong> San Francisco HQ<br>Join fellow tech enthusiasts for a weekend of building, learning, and networking.</p>',
+    ),
+    array(
+        'slug' => 'authors',
+        'title' => 'Authors',
+        'content' => '<h2>Our Team</h2>
+<p>Meet the people behind TechGear Pro who bring you the latest in technology products, reviews, and support.</p>
+<h3>Sarah Johnson - General Manager</h3>
+<p>Sarah oversees all operations at TechGear Pro. With 15 years in tech retail, she ensures every customer gets the best experience possible.</p>
+<h3>Michael Chen - Technical Director</h3>
+<p>Michael leads our technical team and product testing lab. He personally reviews every product before it hits our shelves.</p>
+<h3>David Martinez - Shop Manager</h3>
+<p>David manages our day-to-day store operations and curates our product catalog.</p>
+<h3>Emily Williams - Customer Support Lead</h3>
+<p>Emily and her team handle all customer inquiries and technical support.</p>',
+    ),
+);
+
+$created = 0;
+$updated = 0;
+foreach ($pages as $p) {
+    $existing = get_page_by_path($p['slug']);
+    if ($existing) {
+        // Update content if page exists
+        wp_update_post(array('ID' => $existing->ID, 'post_content' => $p['content']));
+        $updated++;
+        WP_CLI::log("  Updated: {$p['title']} (ID: {$existing->ID})");
+    } else {
+        $id = wp_insert_post(array(
+            'post_title'   => $p['title'],
+            'post_name'    => $p['slug'],
+            'post_content' => $p['content'],
+            'post_status'  => 'publish',
+            'post_type'    => 'page',
+        ));
+        $created++;
+        WP_CLI::log("  Created: {$p['title']} (ID: $id)");
+    }
+}
+WP_CLI::success("Pages done — Created: $created | Updated: $updated");
+PAGES_PHP
+
     print_status "Pages created"
 }
 
@@ -385,13 +605,25 @@ configure_site_settings() {
     print_info "Configuring site settings..."
     wp option update default_comment_status "open" --allow-root
     wp option update show_on_front "page" --allow-root
+
+    # Set Shop as front page
     local SHOP_PAGE_ID
     SHOP_PAGE_ID=$(wp post list --post_type=page --name=shop --field=ID --allow-root)
     if [ ! -z "$SHOP_PAGE_ID" ]; then
         wp option update page_on_front "$SHOP_PAGE_ID" --allow-root
     fi
+
+    # Set Blog as posts page
+    local BLOG_PAGE_ID
+    BLOG_PAGE_ID=$(wp post list --post_type=page --name=blog --field=ID --allow-root)
+    if [ ! -z "$BLOG_PAGE_ID" ]; then
+        wp option update page_for_posts "$BLOG_PAGE_ID" --allow-root
+    fi
+
     wp option update timezone_string "America/Los_Angeles" --allow-root
-    wp menu create "Main Menu" --allow-root
+
+    # Create classic menu (fallback for non-block themes)
+    wp menu create "Main Menu" --allow-root 2>/dev/null || true
     local MENU_ID
     MENU_ID=$(wp menu list --format=ids --allow-root)
     if [ ! -z "$MENU_ID" ]; then
@@ -401,6 +633,168 @@ configure_site_settings() {
         wp menu location assign $MENU_ID primary --allow-root 2>/dev/null || true
     fi
     print_status "Site settings configured"
+}
+
+configure_navigation() {
+    print_info "Configuring block-based navigation and footer..."
+
+    wp eval-file - --allow-root <<'NAV_PHP'
+<?php
+// =========================================================================
+// 1. Build navigation block with relative URLs for all main pages
+// =========================================================================
+$pages_map = array(
+    'Shop'     => 'shop',
+    'Blog'     => 'blog',
+    'About Us' => 'about-us',
+    'FAQ'      => 'faq',
+    'Events'   => 'events',
+    'Authors'  => 'authors',
+    'Contact'  => 'contact',
+);
+
+$nav_content = '';
+foreach ($pages_map as $label => $slug) {
+    $page = get_page_by_path($slug);
+    if ($page) {
+        $nav_content .= '<!-- wp:navigation-link {"label":"' . $label . '","type":"page","id":' . $page->ID . ',"url":"/' . $slug . '/","kind":"post-type"} /-->';
+        WP_CLI::log("  Nav link: $label -> /$slug/ (ID: {$page->ID})");
+    }
+}
+
+// Find or create the wp_navigation post
+$nav_posts = get_posts(array(
+    'post_type'      => 'wp_navigation',
+    'posts_per_page' => 1,
+    'post_status'    => 'publish',
+));
+
+if ($nav_posts) {
+    wp_update_post(array(
+        'ID'           => $nav_posts[0]->ID,
+        'post_content' => $nav_content,
+    ));
+    WP_CLI::log("  Updated navigation block (ID: {$nav_posts[0]->ID})");
+} else {
+    $nav_id = wp_insert_post(array(
+        'post_title'   => 'Navigation',
+        'post_content' => $nav_content,
+        'post_type'    => 'wp_navigation',
+        'post_status'  => 'publish',
+    ));
+    WP_CLI::log("  Created navigation block (ID: $nav_id)");
+}
+
+// =========================================================================
+// 2. Create custom footer template part to override theme default
+// =========================================================================
+$footer_links_left = array(
+    'Blog'    => '/blog/',
+    'About'   => '/about-us/',
+    'FAQs'    => '/faq/',
+    'Authors' => '/authors/',
+);
+$footer_links_right = array(
+    'Events'     => '/events/',
+    'Shop'       => '/shop/',
+    'Contact'    => '/contact/',
+    'My Account' => '/my-account/',
+);
+
+$footer_nav_left = '';
+foreach ($footer_links_left as $label => $url) {
+    $footer_nav_left .= '<!-- wp:navigation-link {"label":"' . $label . '","url":"' . $url . '"} /-->';
+}
+$footer_nav_right = '';
+foreach ($footer_links_right as $label => $url) {
+    $footer_nav_right .= '<!-- wp:navigation-link {"label":"' . $label . '","url":"' . $url . '"} /-->';
+}
+
+$footer_content = '<!-- wp:group {"style":{"spacing":{"padding":{"top":"var:preset|spacing|60","bottom":"var:preset|spacing|50"}}},"layout":{"type":"constrained"}} -->
+<div class="wp-block-group" style="padding-top:var(--wp--preset--spacing--60);padding-bottom:var(--wp--preset--spacing--50)">
+    <!-- wp:group {"align":"wide","layout":{"type":"default"}} -->
+    <div class="wp-block-group alignwide">
+        <!-- wp:site-logo /-->
+        <!-- wp:group {"align":"full","layout":{"type":"flex","flexWrap":"wrap","justifyContent":"space-between","verticalAlignment":"top"}} -->
+        <div class="wp-block-group alignfull">
+            <!-- wp:columns -->
+            <div class="wp-block-columns">
+                <!-- wp:column {"width":"100%"} -->
+                <div class="wp-block-column" style="flex-basis:100%"><!-- wp:site-title {"level":2} /-->
+                <!-- wp:site-tagline /-->
+                </div>
+                <!-- /wp:column -->
+                <!-- wp:column {"width":""} -->
+                <div class="wp-block-column">
+                    <!-- wp:spacer {"height":"var:preset|spacing|40","width":"0px"} -->
+                    <div style="height:var(--wp--preset--spacing--40);width:0px" aria-hidden="true" class="wp-block-spacer"></div>
+                    <!-- /wp:spacer -->
+                </div>
+                <!-- /wp:column -->
+            </div>
+            <!-- /wp:columns -->
+            <!-- wp:group {"style":{"spacing":{"blockGap":"var:preset|spacing|80"}},"layout":{"type":"flex","flexWrap":"wrap","verticalAlignment":"top","justifyContent":"space-between"}} -->
+            <div class="wp-block-group">
+                <!-- wp:navigation {"overlayMenu":"never","layout":{"type":"flex","orientation":"vertical"}} -->
+                    ' . $footer_nav_left . '
+                <!-- /wp:navigation -->
+                <!-- wp:navigation {"overlayMenu":"never","layout":{"type":"flex","orientation":"vertical"}} -->
+                    ' . $footer_nav_right . '
+                <!-- /wp:navigation -->
+            </div>
+            <!-- /wp:group -->
+        </div>
+        <!-- /wp:group -->
+        <!-- wp:spacer {"height":"var:preset|spacing|70"} -->
+        <div style="height:var(--wp--preset--spacing--70)" aria-hidden="true" class="wp-block-spacer"></div>
+        <!-- /wp:spacer -->
+        <!-- wp:group {"align":"full","style":{"spacing":{"blockGap":"var:preset|spacing|20"}},"layout":{"type":"flex","flexWrap":"wrap","justifyContent":"space-between"}} -->
+        <div class="wp-block-group alignfull">
+            <!-- wp:paragraph {"fontSize":"small"} -->
+            <p class="has-small-font-size">TechGear Pro</p>
+            <!-- /wp:paragraph -->
+            <!-- wp:paragraph {"fontSize":"small"} -->
+            <p class="has-small-font-size">Powered by <a href="https://wordpress.org" rel="nofollow">WordPress</a></p>
+            <!-- /wp:paragraph -->
+        </div>
+        <!-- /wp:group -->
+    </div>
+    <!-- /wp:group -->
+</div>
+<!-- /wp:group -->';
+
+// Check if a custom footer template part already exists in DB
+$existing = get_posts(array(
+    'post_type'      => 'wp_template_part',
+    'name'           => 'footer',
+    'posts_per_page' => 1,
+    'post_status'    => 'any',
+));
+
+if ($existing) {
+    wp_update_post(array(
+        'ID'           => $existing[0]->ID,
+        'post_content' => $footer_content,
+    ));
+    WP_CLI::log("  Updated footer template part (ID: {$existing[0]->ID})");
+} else {
+    $footer_id = wp_insert_post(array(
+        'post_title'   => 'Footer',
+        'post_name'    => 'footer',
+        'post_type'    => 'wp_template_part',
+        'post_status'  => 'publish',
+        'post_content' => $footer_content,
+    ));
+    if ($footer_id) {
+        wp_set_object_terms($footer_id, 'twentytwentyfive', 'wp_theme');
+        WP_CLI::log("  Created footer template part (ID: $footer_id)");
+    }
+}
+
+WP_CLI::success("Navigation and footer configured");
+NAV_PHP
+
+    print_status "Navigation and footer configured"
 }
 
 create_sample_orders() {
@@ -612,11 +1006,12 @@ ALL_STEPS=(
     "import_products"
     "create_product_categories"
     "create_users"
-    "generate_blog_content"
+    "create_blog_posts"
     "create_comments"
     "create_pages"
     "configure_contact_forms"
     "configure_site_settings"
+    "configure_navigation"
     "create_sample_orders"
     "configure_acf"
     "print_setup_summary"
