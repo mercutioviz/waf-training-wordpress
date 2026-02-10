@@ -265,6 +265,157 @@ IMPORT_PHP
     print_status "Products imported (${product_count} products in store)"
 }
 
+add_product_images() {
+    print_info "Adding product images from Unsplash..."
+
+    # Dynamically discover product IDs by SKU so images work regardless of DB state
+    # Map: sku|filename|unsplash_photo_url
+    local PRODUCT_IMAGE_MAP=(
+        # Laptops
+        "LAPTOP-MBP15|macbook-pro|https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&q=80"
+        "LAPTOP-XPS13|dell-xps-13|https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=800&q=80"
+        "LAPTOP-X1C9|thinkpad-x1-carbon|https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=800&q=80"
+
+        # Mice
+        "MOUSE-ORLY|gaming-mouse|https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=800&q=80"
+        "MOUSE-MX3S|logitech-mx-master|https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=800&q=80"
+
+        # Cables & Adapters
+        "ADAPT-UC2A3|usb-c-adapter|https://images.unsplash.com/photo-1625842268584-8f3296236761?w=800&q=80"
+        "CABLE-TB4-2M|thunderbolt-cable|https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=800&q=80"
+        "CABLE-HDMI21|hdmi-cable|https://images.unsplash.com/photo-1605236453806-6ff36851218e?w=800&q=80"
+        "CABLE-DP14|displayport-cable|https://images.unsplash.com/photo-1625842268584-8f3296236761?w=800&q=80"
+        "ADAPT-UC2H4K|usb-c-hdmi-adapter|https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=800&q=80"
+
+        # Hubs & Docks
+        "HUB-USB7P|usb-hub|https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?w=800&q=80"
+        "DOCK-UC2K|docking-station|https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?w=800&q=80"
+
+        # Keyboards
+        "KB-MXBLUE|mechanical-keyboard|https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?w=800&q=80"
+        "KB-K8WL|keychron-k8|https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=800&q=80"
+
+        # Monitors
+        "MON-27-4K|4k-ips-monitor|https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800&q=80"
+        "MON-34UW|ultrawide-gaming-monitor|https://images.unsplash.com/photo-1593640408182-31c70c8268f5?w=800&q=80"
+
+        # Webcam & Microphone
+        "CAM-4KAF|4k-webcam|https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=800&q=80"
+        "MIC-UCOND|usb-condenser-mic|https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=800&q=80"
+
+        # Headset
+        "HS-WLANC|noise-canceling-headset|https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80"
+
+        # Tablets
+        "TAB-IPAD12|ipad-pro|https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=800&q=80"
+        "TAB-AND11|android-tablet|https://images.unsplash.com/photo-1561154464-82e9adf32764?w=800&q=80"
+
+        # Stylus
+        "PEN-SURF|surface-pen|https://images.unsplash.com/photo-1585790050230-5dd28404ccb9?w=800&q=80"
+
+        # Chargers
+        "CHG-65GAN|gan-usb-c-charger|https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800&q=80"
+        "CHG-100W2C|dual-usb-c-charger|https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=800&q=80"
+
+        # Power Bank
+        "PWR-20KPD|power-bank|https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=800&q=80"
+
+        # Smart Home
+        "SH-BULB4|smart-led-bulbs|https://images.unsplash.com/photo-1558089687-f282ffcbc126?w=800&q=80"
+        "SH-PLUG2|smart-plug|https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=800&q=80"
+        "SH-THERM|smart-thermostat|https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=800&q=80"
+
+        # Networking
+        "NET-MESH3|mesh-router|https://images.unsplash.com/photo-1606904825846-647eb07f5be2?w=800&q=80"
+        "NET-SW8G|ethernet-switch|https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=80"
+
+        # Storage
+        "NAS-2BAY|nas-storage|https://images.unsplash.com/photo-1597852074816-d933c7d2b988?w=800&q=80"
+        "SSD-1TNVM|nvme-ssd|https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=800&q=80"
+        "SSD-2TPORT|portable-ssd|https://images.unsplash.com/photo-1531492746076-161ca9bcad58?w=800&q=80"
+
+        # Accessories
+        "BAG-TECH1|tech-backpack|https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&q=80"
+        "STAND-ALU|laptop-stand|https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=800&q=80"
+        "LAMP-LEDWC|led-desk-lamp|https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?w=800&q=80"
+        "CLEAN-SCR|screen-cleaning-kit|https://images.unsplash.com/photo-1563206767-5b18f218e8de?w=800&q=80"
+        "SPK-BTWP|bluetooth-speaker|https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=800&q=80"
+        "LIGHT-RING|ring-light|https://images.unsplash.com/photo-1598550476439-6847785fcea6?w=800&q=80"
+        "TAB-EREADER|e-reader|https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&q=80"
+
+        # Gaming
+        "CTRL-WLPC|wireless-controller|https://images.unsplash.com/photo-1592840496694-26d035b52b48?w=800&q=80"
+
+        # PC Components
+        "RAM-32D5|ddr5-ram|https://images.unsplash.com/photo-1562976540-1502c2145186?w=800&q=80"
+        "PSU-850M|modular-psu|https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=800&q=80"
+        "CASE-MATX|atx-case|https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=800&q=80"
+        "COOL-240A|aio-liquid-cooler|https://images.unsplash.com/photo-1591488320449-011701bb6704?w=800&q=80"
+        "FAN-RGB3|rgb-case-fans|https://images.unsplash.com/photo-1591488320449-011701bb6704?w=800&q=80"
+        "THP-PERF|thermal-paste|https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80"
+        "TOOL-PCKIT|pc-toolkit|https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&q=80"
+        "GPU-4070|rtx-4070-gpu|https://images.unsplash.com/photo-1591488320449-011701bb6704?w=800&q=80"
+    )
+
+    local imported=0
+    local skipped=0
+    local failed=0
+    local total=${#PRODUCT_IMAGE_MAP[@]}
+
+    for entry in "${PRODUCT_IMAGE_MAP[@]}"; do
+        IFS='|' read -r SKU FILENAME IMAGE_URL <<< "$entry"
+
+        # Look up product ID by SKU
+        PRODUCT_ID=$(wp post list --post_type=product --meta_key=_sku --meta_value="$SKU" --field=ID --allow-root 2>/dev/null)
+        if [ -z "$PRODUCT_ID" ]; then
+            print_info "  Skipping $SKU ($FILENAME) - product not found"
+            ((skipped++))
+            continue
+        fi
+
+        # Check if product already has a featured image
+        EXISTING_THUMB=$(wp post meta get "$PRODUCT_ID" _thumbnail_id --allow-root 2>/dev/null)
+        if [ ! -z "$EXISTING_THUMB" ] && [ "$EXISTING_THUMB" != "" ]; then
+            ((skipped++))
+            continue
+        fi
+
+        # Download image
+        curl -sL "$IMAGE_URL" -o "/tmp/${FILENAME}.jpg" 2>/dev/null
+        if [ $? -ne 0 ] || [ ! -s "/tmp/${FILENAME}.jpg" ]; then
+            print_error "  Failed to download image for $FILENAME ($SKU)"
+            ((failed++))
+            continue
+        fi
+
+        # Import into media library
+        ATTACHMENT_ID=$(wp media import "/tmp/${FILENAME}.jpg" \
+            --title="$FILENAME" \
+            --porcelain \
+            --allow-root 2>/dev/null)
+
+        if [ -z "$ATTACHMENT_ID" ]; then
+            print_error "  Failed to import $FILENAME into media library"
+            ((failed++))
+            rm -f "/tmp/${FILENAME}.jpg"
+            continue
+        fi
+
+        # Set as featured image
+        wp post meta update "$PRODUCT_ID" _thumbnail_id "$ATTACHMENT_ID" --allow-root 2>/dev/null
+
+        if [ $? -eq 0 ]; then
+            ((imported++))
+        else
+            ((failed++))
+        fi
+
+        rm -f "/tmp/${FILENAME}.jpg"
+    done
+
+    print_status "Product images: Imported $imported | Skipped $skipped | Failed $failed (of $total)"
+}
+
 create_product_categories() {
     print_info "Creating product categories..."
     local CATEGORIES=("Laptops" "Accessories" "Cables & Adapters" "Gaming" "Smart Home" "Networking" "Storage" "PC Components" "Monitors" "Tablets")
@@ -946,7 +1097,7 @@ print_setup_summary() {
     echo "  - And more..."
     echo ""
     echo -e "${YELLOW}WAF Training Features:${NC}"
-    echo "  ✓ 50+ products with special characters in names"
+    echo "  ✓ 50+ products with images and special characters in names"
     echo "  ✓ Contact forms accepting code snippets & error messages"
     echo "  ✓ Comments with SQL-like and HTML-like content"
     echo "  ✓ Product descriptions with quotes, apostrophes, HTML entities"
@@ -1004,6 +1155,7 @@ ALL_STEPS=(
     "install_plugins"
     "configure_woocommerce"
     "import_products"
+    "add_product_images"
     "create_product_categories"
     "create_users"
     "create_blog_posts"
