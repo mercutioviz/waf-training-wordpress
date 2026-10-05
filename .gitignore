@@ -6,6 +6,9 @@ logs/
 # Environment variables
 .env
 
+# Self-signed TLS keypair (regenerate with ./generate-certs.sh)
+certs/
+
 # OS files
 .DS_Store
 Thumbs.db

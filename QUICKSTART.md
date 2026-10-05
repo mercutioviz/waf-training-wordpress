@@ -5,6 +5,7 @@
 ### Step 1: Start the Environment
 ```bash
 cd wordpress-waf-training
+./generate-certs.sh      # self-signed cert for HTTPS - nginx won't start without it
 docker-compose up -d
 ```
 
@@ -22,11 +23,15 @@ docker-compose exec wpcli bash /setup.sh
 ⏱️ This takes 5-10 minutes. Grab a coffee!
 
 ### Step 4: Access the Site
-- **WordPress**: http://localhost:8080
+- **WordPress**: http://localhost:8080 or https://localhost:8443
 - **Admin Panel**: http://localhost:8080/wp-admin
   - Username: `admin`
   - Password: `TechGear2024!`
 - **phpMyAdmin**: http://localhost:8081
+
+> HTTPS uses a self-signed cert, so browsers warn and curl needs `-k`. Both
+> schemes serve the same site - HTTP is not redirected, so you can replay a
+> request over each and compare what the WAF sees.
 
 ## First Training Exercise (15 minutes)
 
@@ -126,6 +131,15 @@ sudo bash docker-cleanup.sh
 **Can't access site on :8080?**
 - Check if port is available: `lsof -i :8080`
 - Change port in docker-compose.yml if needed
+
+**nginx won't start / "cannot load certificate"?**
+- The cert is missing: run `./generate-certs.sh`, then `docker-compose up -d nginx`
+
+**Browser warns the certificate isn't trusted?**
+- Expected - it's self-signed. Click through, or use `curl -k`.
+- Name mismatch warning means you used a hostname outside the cert's SAN
+  (`techgear.local`, `localhost`, `127.0.0.1`). Regenerate with a different name
+  by editing `CERT_NAME` in `generate-certs.sh` and running it with `--force`.
 
 **Setup script fails?**
 - Wait longer for WordPress to initialize

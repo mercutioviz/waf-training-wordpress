@@ -9,6 +9,10 @@
 SITE_URL="${1:-${SITE_URL:-http://localhost:8080}}"
 VERBOSE="${VERBOSE:-0}"
 
+# The lab's HTTPS listener uses a self-signed cert, so skip verification -
+# otherwise every https test fails at the TLS handshake and reads as a WAF block.
+CURL_OPTS=(--insecure)
+
 # Realistic browser User-Agent strings
 USER_AGENTS=(
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
@@ -100,9 +104,9 @@ test_request() {
     fi
 
     if [ "$method" = "GET" ]; then
-        response=$(curl -s -w "\n%{http_code}" -A "$UA_STRING" "$url" 2>&1)
+        response=$(curl -s "${CURL_OPTS[@]}" -w "\n%{http_code}" -A "$UA_STRING" "$url" 2>&1)
     else
-        response=$(curl -s -w "\n%{http_code}" -A "$UA_STRING" -X "$method" -d "$data" "$url" 2>&1)
+        response=$(curl -s "${CURL_OPTS[@]}" -w "\n%{http_code}" -A "$UA_STRING" -X "$method" -d "$data" "$url" 2>&1)
     fi
 
     http_code=$(echo "$response" | tail -n1)
@@ -174,7 +178,7 @@ echo -e "\n${YELLOW}=== Test Suite 8: User-Agent Tests ===${NC}"
 test_request "GET" "$SITE_URL/" "" "Request with normal User-Agent"
 
 print_test "Request with suspicious User-Agent (sqlmap)"
-suspicious_code=$(curl -s -o /dev/null -w "%{http_code}" -H "User-Agent: sqlmap/1.0" "$SITE_URL/")
+suspicious_code=$(curl -s "${CURL_OPTS[@]}" -o /dev/null -w "%{http_code}" -H "User-Agent: sqlmap/1.0" "$SITE_URL/")
 if [ "$suspicious_code" = "403" ] || [ "$suspicious_code" = "406" ]; then
     print_pass "HTTP $suspicious_code - Suspicious UA correctly blocked"
     record_result "Suspicious UA (sqlmap) - expected block" "$suspicious_code" "PASS"
@@ -192,7 +196,7 @@ print_test "Sending 10 rapid requests to test rate limiting"
 
 rate_limit_blocked=0
 for i in {1..10}; do
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" -A "$UA_STRING" "$SITE_URL/")
+    http_code=$(curl -s "${CURL_OPTS[@]}" -o /dev/null -w "%{http_code}" -A "$UA_STRING" "$SITE_URL/")
     if [ "$http_code" = "429" ] || [ "$http_code" = "403" ]; then
         ((rate_limit_blocked++))
     fi

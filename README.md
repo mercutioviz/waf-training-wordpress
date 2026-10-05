@@ -41,7 +41,8 @@ This Docker-based setup creates a realistic e-commerce site with intentionally c
 ### Prerequisites
 - Docker and Docker Compose installed
 - At least 4GB of available RAM
-- Ports 8080 and 8081 available
+- Ports 8080, 8443 and 8081 available
+- `openssl` (for the self-signed HTTPS certificate)
 
 ### Installation
 
@@ -50,18 +51,25 @@ This Docker-based setup creates a realistic e-commerce site with intentionally c
    cd wordpress-waf-training
    ```
 
-2. **Start the containers**
+2. **Generate the self-signed TLS certificate**
+   ```bash
+   ./generate-certs.sh
+   ```
+   Writes `certs/techgear.local.crt` and `.key` (gitignored). nginx will not start
+   without them.
+
+3. **Start the containers**
    ```bash
    docker-compose up -d
    ```
 
-3. **Wait for WordPress to initialize** (about 30-60 seconds)
+4. **Wait for WordPress to initialize** (about 30-60 seconds)
    ```bash
    docker-compose logs -f wordpress
    # Wait for "ready to handle connections" message
    ```
 
-4. **Run the setup script**
+5. **Run the setup script**
    ```bash
    docker-compose exec wpcli bash /setup.sh
    ```
@@ -74,10 +82,42 @@ This Docker-based setup creates a realistic e-commerce site with intentionally c
    - Create sample orders
    - Configure contact forms
 
-5. **Access your site**
-   - **WordPress site**: http://localhost:8080
+6. **Access your site**
+   - **WordPress site**: http://localhost:8080 or https://localhost:8443
    - **Admin panel**: http://localhost:8080/wp-admin
    - **phpMyAdmin**: http://localhost:8081
+
+### HTTPS
+
+The nginx proxy serves the same site on both `:8080` (plain HTTP) and `:8443`
+(TLS, HTTP/2). HTTP is **not** redirected to HTTPS on purpose - replaying an
+identical request over both schemes and diffing what the WAF logs is a useful
+training exercise in itself.
+
+The certificate is self-signed, so expect a browser warning (click through it)
+and pass `-k`/`--insecure` to curl. `test-waf.sh` already does.
+
+The cert's SAN covers `techgear.local`, `localhost` and `127.0.0.1`. To use the
+`techgear.local` name, add a hosts-file entry on the *client* machine:
+
+```
+<docker-host-ip>  techgear.local
+```
+
+Then browse to https://techgear.local:8443.
+
+WordPress follows whatever scheme and host the request arrived on - `setup.sh`
+writes protocol-aware `WP_HOME`/`WP_SITEURL` into `wp-config.php`, and nginx
+passes the scheme through to PHP-FPM. If a TLS-terminating WAF sits in front of
+this proxy, send `X-Forwarded-Proto: https` and WordPress will emit `https://`
+URLs even though the hop to nginx is plain HTTP.
+
+To regenerate the keypair (for example with a different hostname or expiry):
+
+```bash
+./generate-certs.sh --force
+docker-compose restart nginx
+```
 
 ### Default Credentials
 
@@ -212,9 +252,16 @@ server {
         proxy_pass http://wordpress;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        # Required if the WAF terminates TLS - without it WordPress emits
+        # http:// links and mixed-content/redirect-loop symptoms follow.
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
+
+To inspect encrypted traffic end to end instead, point the WAF upstream at
+`https://localhost:8443` and disable upstream verification (the cert is
+self-signed): `proxy_pass https://wordpress;` plus `proxy_ssl_verify off;`.
 
 ### Method 2: Docker Network
 1. Modify `docker-compose.yml` to add your WAF container
