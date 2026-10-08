@@ -119,6 +119,65 @@ To regenerate the keypair (for example with a different hostname or expiry):
 docker-compose restart nginx
 ```
 
+### Decrypting captured TLS traffic
+
+For packet-level analysis you can have nginx log TLS session secrets in
+[NSS Key Log Format](https://wiki.wireshark.org/TLS), letting Wireshark decrypt
+a `tcpdump` capture of port 8443.
+
+**The server private key in `certs/` will not do this.** `nginx.conf` pins ECDHE
+cipher suites and TLS 1.3, so forward secrecy applies and the key log is the
+only way in.
+
+nginx's own `ssl_key_log` directive is NGINX Plus commercial-only, and the
+official images aren't built with OpenSSL's `enable-sslkeylog`. So the nginx
+image here is built from `nginx/Dockerfile`, which compiles a small `LD_PRELOAD`
+shim (`nginx/sslkeylog.c`) that registers OpenSSL's keylog callback. The shim
+ships in the image but stays **inert** unless both `LD_PRELOAD` and
+`SSLKEYLOGFILE` are set, so normal runs are unaffected.
+
+```bash
+./setup-keylog.sh on       # enable, rebuild nginx, print the capture recipe
+./setup-keylog.sh status   # show whether it's active + key count
+./setup-keylog.sh off      # back to stock behaviour
+./setup-keylog.sh clear    # wipe the collected secrets
+```
+
+Capture workflow:
+
+```bash
+./setup-keylog.sh on
+
+# 1. Start the capture FIRST - a session whose handshake isn't in the pcap
+#    cannot be decrypted, even with the right keys.
+sudo tcpdump -i any -s 0 -w capture.pcap 'tcp port 8443'
+
+# 2. In another shell, generate traffic
+./test-waf.sh https://localhost:8443
+
+# 3. Ctrl+C the capture, then embed the secrets so the pcap is self-contained
+editcap --inject-secrets tls,keylog/keys.log capture.pcap capture-dsb.pcapng
+```
+
+Alternatively point Wireshark at the key log directly: *Preferences → Protocols
+→ TLS → (Pre)-Master-Secret log filename*. You'll also want *Allow subdissector
+to reassemble TCP streams* enabled under the TCP protocol preferences.
+
+Two things that commonly cause an empty key log or failed decryption:
+
+- **Session resumption.** A resumed session reuses secrets from an earlier
+  handshake that may not be in your capture. `ssl_session_tickets off` is
+  already set; add `ssl_session_cache off` to `nginx/nginx.conf` during capture
+  if sessions still resume.
+- **Permissions.** nginx workers run as uid 101, and a bind mount keeps the
+  *host* directory's ownership. `setup-keylog.sh` chowns `keylog/` to 101
+  (falling back to world-writable without sudo); if the file stays empty while
+  `status` reports active, check that first.
+
+> ⚠️ The key log decrypts **every** TLS session nginx serves while enabled, not
+> just your own requests. Treat it as sensitive as the private key. `keylog/`,
+> `*.pcap` and `*.pcapng` are gitignored. Lab use only - never in production.
+
 ### Default Credentials
 
 **WordPress Admin**

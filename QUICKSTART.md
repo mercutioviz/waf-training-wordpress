@@ -135,6 +135,18 @@ sudo bash docker-cleanup.sh
 **nginx won't start / "cannot load certificate"?**
 - The cert is missing: run `./generate-certs.sh`, then `docker-compose up -d nginx`
 
+**Need to decrypt a tcpdump capture of :8443?**
+```bash
+./setup-keylog.sh on     # then follow the printed capture recipe
+```
+- The cert's private key can't decrypt it (ECDHE/TLS 1.3 forward secrecy) - you
+  need the key log. See the "Decrypting captured TLS traffic" section in README.md.
+
+**Key log stays empty after enabling?**
+- Check `./setup-keylog.sh status` - if `.env` says enabled but the container
+  doesn't, nginx wasn't recreated: `docker-compose up -d nginx`
+- Otherwise it's usually permissions on `keylog/` (workers run as uid 101)
+
 **Browser warns the certificate isn't trusted?**
 - Expected - it's self-signed. Click through, or use `curl -k`.
 - Name mismatch warning means you used a hostname outside the cert's SAN

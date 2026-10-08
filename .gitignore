@@ -9,6 +9,11 @@ logs/
 # Self-signed TLS keypair (regenerate with ./generate-certs.sh)
 certs/
 
+# TLS session secrets - decrypts every captured session, treat as private key
+keylog/
+*.pcap
+*.pcapng
+
 # OS files
 .DS_Store
 Thumbs.db
