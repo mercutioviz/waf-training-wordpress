@@ -102,11 +102,22 @@ workers, so without it the shim loads and silently logs nothing. It is a config
 error inside `http{}`.
 
 **Content seeding** lives in `setup.sh` (~1200 lines, one function per step),
-with products in `products.csv`, form definitions in `forms-config.json`, and
-image attachment split out to `product-images.sh`. When adding seeded content,
-make it *plausibly legitimate yet rule-tripping* — that's the whole design
-constraint. `FALSE_POSITIVES.md` catalogs which trigger is meant to fire which
-rule category; update it alongside any content change.
+with products read from `products.csv`. The Contact Form 7 forms are *not* read
+from a file — they are inlined as `wp eval` PHP in
+`setup.sh:configure_contact_forms`, which is where to edit them. Product images
+are likewise handled in-script by `add_product_images()`, which resolves
+products by SKU (`wp post list --meta_key=_sku`) so it survives a re-import.
+When adding seeded content, make it *plausibly legitimate yet rule-tripping* —
+that's the whole design constraint. `FALSE_POSITIVES.md` catalogs which trigger
+is meant to fire which rule category; update it alongside any content change.
+
+**`forms-config.json` is an unimplemented spec, not live config.** Nothing
+reads it — it is bind-mounted into the wpcli container and otherwise unused. It
+defines five forms where `configure_contact_forms` creates only two (Contact Us,
+Technical Support). **Product Inquiry, Partnership Request and Developer API
+Access are outstanding**: they exist nowhere but this file, and its
+`form_content` fields are the spec to build them from. Don't mistake it for a
+stale artifact and delete it.
 
 ## Gotchas
 

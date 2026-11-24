@@ -167,7 +167,7 @@ waf-training-wordpress/
 ├── fix-http-host.sh
 ├── diagnose-wordpress.sh
 ├── products.csv
-├── forms-config.json
+├── forms-config.json        # form spec, not read at runtime
 ├── wp-cli.yml
 ├── .env.example
 ├── README.md

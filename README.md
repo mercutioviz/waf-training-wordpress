@@ -545,7 +545,8 @@ wordpress-waf-training/
 ├── nginx.conf             # nginx web server configuration
 ├── setup.sh              # Automated setup script
 ├── products.csv          # 50 sample products
-├── forms-config.json     # Contact form definitions
+├── forms-config.json     # CF7 form spec; not read at runtime (setup.sh
+│                         #   inlines 2 of its 5 forms, 3 unimplemented)
 ├── README.md            # This file
 └── logs/               # Application logs (created at runtime)
     ├── nginx/
