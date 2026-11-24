@@ -36,6 +36,13 @@ docker-compose exec wpcli bash /setup.sh import_products create_comments
 docker-compose exec wpcli bash /setup.sh nonexistent_step   # prints all step names
 ```
 
+A failed step does not abort the run — provisioning continues so one broken step
+doesn't block the rest — but it is no longer invisible: `main` collects failures,
+lists them at the end with a ready-to-paste re-run command, and **exits 1**. So
+`$?` is meaningful, and a clean run is exit 0 with no `FAILED step` lines. (It
+previously discarded `run_step`'s return value and exited with the status of the
+last command, which is how a step that created nothing passed as successful.)
+
 **After editing `setup.sh`, `products.csv`, `forms-config.json` or `wp-cli.yml`,
 recreate the wpcli container before re-running a step:**
 

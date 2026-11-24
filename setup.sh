@@ -1299,6 +1299,13 @@ ALL_STEPS=(
 # MAIN
 ###############################################################################
 main() {
+    # Steps that returned non-zero. Provisioning deliberately continues past a
+    # failure so one broken step doesn't block the rest of the run, but the run
+    # as a whole must not then look successful: previously run_step's return
+    # value was discarded entirely and the script exited 0 with the status of
+    # the last command, so a failed step was invisible to any caller or CI.
+    local failed_steps=()
+
     echo "=========================================="
     echo "TechGear Pro WAF Training Setup"
     echo "=========================================="
@@ -1309,7 +1316,7 @@ main() {
         for step in "$@"; do
             # Verify the function exists
             if declare -f "$step" > /dev/null 2>&1; then
-                run_step "$step" "$step"
+                run_step "$step" "$step" || failed_steps+=("$step")
             else
                 print_error "Unknown step: $step"
                 echo ""
@@ -1323,11 +1330,27 @@ main() {
     else
         # Run all steps in order
         for step in "${ALL_STEPS[@]}"; do
-            run_step "$step" "$step"
+            run_step "$step" "$step" || failed_steps+=("$step")
         done
         # Final rewrite flush
-        wp rewrite flush --allow-root
+        wp rewrite flush --allow-root || print_error "Final rewrite flush failed"
     fi
+
+    if [ ${#failed_steps[@]} -gt 0 ]; then
+        echo ""
+        echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        print_error "${#failed_steps[@]} step(s) FAILED:"
+        for s in "${failed_steps[@]}"; do
+            echo "      - $s"
+        done
+        echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo "Re-run only the failed steps with:"
+        echo "  docker-compose exec wpcli bash /setup.sh ${failed_steps[*]}"
+        return 1
+    fi
+
+    return 0
 }
 
 main "$@"

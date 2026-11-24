@@ -30,30 +30,52 @@ for c in techgear_nginx techgear_wordpress techgear_mysql; do
         pass "$c is running"
         # Check OOMKilled
         OOM=$(docker inspect -f '{{.State.OOMKilled}}' "$c" 2>/dev/null)
-        [ "$OOM" = "true" ] && { fail "$c was OOM-killed!"; ((ERRORS++)); }
+        [ "$OOM" = "true" ] && { fail "$c was OOM-killed!"; ERRORS=$((ERRORS + 1)); }
     else
         fail "$c state: $STATE"
-        ((ERRORS++))
+        ERRORS=$((ERRORS + 1))
     fi
 done
 
 # ─────────────────────────────────────────────
 header "2. HTTP Response Test (localhost:8080)"
 # ─────────────────────────────────────────────
-HTTP_CODE=$(curl -so /dev/null -w "%{http_code}" --max-time 10 http://localhost:8080/ 2>/dev/null || echo "000")
+# Report the response time alongside the code. A slow-but-working site and a
+# dead one both used to collapse into "000", which hid the real symptom: the
+# previous --max-time of 10s was shorter than some legitimate responses here,
+# so a working site was reported as refused.
+HTTP_TIMEOUT=30
+HTTP_OUT=$(curl -so /dev/null -w "%{http_code} %{time_total}" --max-time "$HTTP_TIMEOUT" http://localhost:8080/ 2>/dev/null || true)
+HTTP_CODE=$(echo "$HTTP_OUT" | awk '{print $1}')
+HTTP_TIME=$(echo "$HTTP_OUT" | awk '{print $2}')
+[ -z "$HTTP_CODE" ] && HTTP_CODE="000"
+
 if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
-    pass "HTTP $HTTP_CODE — site is responding"
+    pass "HTTP $HTTP_CODE in ${HTTP_TIME}s — site is responding"
+    # Anything past a couple of seconds for a local request is worth surfacing;
+    # it usually means PHP is blocking on something (loopback request, external
+    # API call from a plugin) rather than that the stack is broken.
+    if [ -n "$HTTP_TIME" ] && [ "${HTTP_TIME%%.*}" -ge 3 ] 2>/dev/null; then
+        info "Response took ${HTTP_TIME}s — slow for a local request; check section 9 and plugin loopback/outbound calls"
+    fi
 elif [ "$HTTP_CODE" = "503" ]; then
     fail "HTTP 503 — upstream (PHP-FPM) is unreachable from nginx"
-    ((ERRORS++))
+    ERRORS=$((ERRORS + 1))
 elif [ "$HTTP_CODE" = "502" ]; then
     fail "HTTP 502 — bad gateway, PHP-FPM may have crashed"
-    ((ERRORS++))
+    ERRORS=$((ERRORS + 1))
 elif [ "$HTTP_CODE" = "000" ]; then
-    fail "Connection refused or timed out — nginx may not be running"
-    ((ERRORS++))
+    # Distinguish "nothing listening" from "took longer than the timeout".
+    if curl -so /dev/null --connect-timeout 5 --max-time 5 http://localhost:8080/ 2>/dev/null; then
+        fail "Request did not complete within ${HTTP_TIMEOUT}s"
+    elif (echo > /dev/tcp/127.0.0.1/8080) 2>/dev/null; then
+        fail "Port 8080 accepts connections but no response within ${HTTP_TIMEOUT}s — PHP is hanging, not nginx"
+    else
+        fail "Connection refused — nginx is not listening on 8080"
+    fi
+    ERRORS=$((ERRORS + 1))
 else
-    info "HTTP $HTTP_CODE"
+    info "HTTP $HTTP_CODE in ${HTTP_TIME}s"
 fi
 
 # ─────────────────────────────────────────────
@@ -66,41 +88,43 @@ docker exec techgear_nginx cat /var/log/nginx/wordpress-error.log 2>/dev/null | 
 # ─────────────────────────────────────────────
 header "4. PHP-FPM Process Check (wordpress container)"
 # ─────────────────────────────────────────────
-FPM_COUNT=$(docker exec techgear_wordpress sh -c 'ps aux 2>/dev/null | grep "[p]hp-fpm" | wc -l' 2>/dev/null || echo "0")
+# Use `docker top`, which inspects the container's processes from the host.
+# The previous check ran `ps aux` *inside* the container, but the wordpress:fpm
+# image ships no procps - so the count was always 0 and this always reported
+# "PHP-FPM is NOT running" even while the site served traffic normally.
+FPM_COUNT=$(docker top techgear_wordpress 2>/dev/null | grep -c "php-fpm" || true)
 FPM_COUNT=$(echo "$FPM_COUNT" | tr -d '[:space:]')
+[ -z "$FPM_COUNT" ] && FPM_COUNT=0
+
 if [ "$FPM_COUNT" -gt 0 ] 2>/dev/null; then
-    pass "PHP-FPM running ($FPM_COUNT processes)"
+    pass "PHP-FPM running ($FPM_COUNT processes: 1 master + $((FPM_COUNT - 1)) worker(s))"
 else
     fail "PHP-FPM is NOT running inside techgear_wordpress"
-    ((ERRORS++))
+    ERRORS=$((ERRORS + 1))
     info "Try: docker compose restart wordpress"
 fi
 
 # ─────────────────────────────────────────────
 header "5. TCP Connectivity: nginx → wordpress:9000"
 # ─────────────────────────────────────────────
-# nginx:alpine may not have nc, so try from both sides
-NC_RESULT=$(docker exec techgear_nginx sh -c '(echo > /dev/tcp/wordpress/9000) 2>/dev/null && echo OK || echo FAIL' 2>/dev/null || echo "SKIP")
-if [ "$NC_RESULT" = "SKIP" ]; then
-    # Try with wget --spider or a simple php test from wordpress side
-    NC_RESULT=$(docker exec techgear_nginx sh -c 'nc -zv wordpress 9000 2>&1 && echo OK' 2>/dev/null | grep -c "OK" || echo "0")
-    if [ "$NC_RESULT" = "0" ]; then
-        # Last resort: verify from wordpress container itself
-        LISTEN=$(docker exec techgear_wordpress sh -c 'ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null' 2>/dev/null | grep ':9000' || true)
-        if [ -n "$LISTEN" ]; then
-            pass "Port 9000 is listening inside wordpress container"
-        else
-            fail "Port 9000 is NOT listening — PHP-FPM not bound"
-            ((ERRORS++))
-        fi
-    else
-        pass "nginx can reach wordpress:9000"
-    fi
-elif [ "$NC_RESULT" = "OK" ]; then
+# nginx:alpine ships busybox nc, which handles -z fine. The previous probe used
+# bash's /dev/tcp, which busybox ash does not implement - so it always returned
+# FAIL and this section reported the upstream unreachable even when it wasn't.
+# A missing nc is reported as "cannot test", not as a failure.
+if docker exec techgear_nginx nc -z -w3 wordpress 9000 >/dev/null 2>&1; then
     pass "nginx can reach wordpress:9000"
+elif ! docker exec techgear_nginx sh -c 'command -v nc >/dev/null 2>&1'; then
+    info "nc not available in the nginx image — cannot probe directly"
+    # Fall back to confirming FPM is bound, from the host.
+    if docker top techgear_wordpress 2>/dev/null | grep -q "php-fpm: master"; then
+        info "PHP-FPM master is running; assume :9000 is bound"
+    else
+        fail "PHP-FPM master not running — :9000 cannot be bound"
+        ERRORS=$((ERRORS + 1))
+    fi
 else
     fail "nginx CANNOT reach wordpress:9000"
-    ((ERRORS++))
+    ERRORS=$((ERRORS + 1))
 fi
 
 # ─────────────────────────────────────────────
@@ -116,7 +140,7 @@ if echo "$PING" | grep -q "alive"; then
     pass "MySQL is alive"
 else
     fail "MySQL ping failed: $PING"
-    ((ERRORS++))
+    ERRORS=$((ERRORS + 1))
 fi
 
 # ─────────────────────────────────────────────
@@ -154,7 +178,7 @@ echo ""
 DISK_PCT=$(df / --output=pcent | tail -1 | tr -d ' %')
 if [ "$DISK_PCT" -gt 90 ]; then
     fail "Disk usage at ${DISK_PCT}% — this could cause failures"
-    ((ERRORS++))
+    ERRORS=$((ERRORS + 1))
 else
     pass "Disk usage at ${DISK_PCT}%"
 fi
@@ -168,7 +192,7 @@ if [ -n "$RESOLVE" ]; then
     info "$RESOLVE"
 else
     fail "nginx cannot resolve 'wordpress' — network issue"
-    ((ERRORS++))
+    ERRORS=$((ERRORS + 1))
     info "Try: docker compose down && docker compose up -d"
 fi
 
