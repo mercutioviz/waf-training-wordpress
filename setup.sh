@@ -725,29 +725,124 @@ PAGES_PHP
 }
 
 configure_contact_forms() {
-    print_info "Configuring Contact Forms..."
+    print_info "Configuring Contact Forms from forms-config.json..."
 
-    wp eval 'wpcf7_contact_form::get_instance( WPCF7_ContactForm::save( array(
-        "title" => "Contact Us",
-        "form" => "[text* your-name placeholder \"Your Name\"]\n\n[email* your-email placeholder \"Email Address\"]\n\n[tel your-phone placeholder \"Phone Number (optional)\"]\n\n[select your-subject \"General Inquiry\" \"Product Question\" \"Technical Support\" \"Partnership Opportunity\" \"Other\"]\n\n[textarea* your-message placeholder \"How can we help you? Feel free to include error messages, code snippets, or technical details.\"]\n\n[file your-attachment limit:5mb filetypes:jpg|jpeg|png|pdf|txt|log]\n\n[checkbox consent use_label_element \"I agree to the privacy policy\"]\n\n[submit \"Send Message\"]",
-        "mail" => array(
-            "subject" => "[_site_title] - [your-subject]",
-            "sender" => "[your-name] <wordpress@techgearpro.local>",
-            "body" => "From: [your-name] <[your-email]>\nPhone: [your-phone]\nSubject: [your-subject]\n\nMessage:\n[your-message]",
-            "recipient" => "admin@techgearpro.local",
-        ),
-    ) ) );' --allow-root 2>/dev/null || print_info "Contact form created"
+    if [ ! -f /forms-config.json ]; then
+        print_error "/forms-config.json not found (is it still bind-mounted in docker-compose.yml?)"
+        return 1
+    fi
 
-    wp eval 'wpcf7_contact_form::get_instance( WPCF7_ContactForm::save( array(
-        "title" => "Technical Support",
-        "form" => "[text* customer-name placeholder \"Your Name\"]\n\n[email* customer-email placeholder \"Email Address\"]\n\n[text order-number placeholder \"Order Number (if applicable)\"]\n\n[select product-category \"Laptops\" \"Accessories\" \"Cables & Adapters\" \"Gaming\" \"Smart Home\" \"Networking\" \"Storage\" \"PC Components\" \"Other\"]\n\n[text* product-name placeholder \"Product Name or SKU\"]\n\n[textarea* issue-description placeholder \"Please describe your technical issue. Include error messages or system info. Example: Getting error: Cannot connect to server at 192.168.1.1\"]\n\n[file attachments limit:10mb filetypes:jpg|jpeg|png|pdf|txt|log|xml|json]\n\n[submit \"Submit Support Request\"]",
-        "mail" => array(
-            "subject" => "[_site_title] - Support Request",
-            "sender" => "[customer-name] <wordpress@techgearpro.local>",
-            "body" => "Support Request\n\nFrom: [customer-name] <[customer-email]>\nOrder: [order-number]\nProduct: [product-name]\nCategory: [product-category]\n\nIssue:\n[issue-description]",
-            "recipient" => "support@techgearpro.local",
+    # Contact Form 7's form API is instance-based: get_template() is the only
+    # static entry point, and set_title()/set_properties()/save() are then called
+    # on the returned object.
+    #
+    # An earlier version of this step called WPCF7_ContactForm::save() statically.
+    # That is a PHP fatal ("Non-static method ... cannot be called statically"),
+    # and it was hidden behind `2>/dev/null || print_info "Contact form created"`
+    # - the || branch runs on FAILURE, so the log printed "created" precisely when
+    # nothing was created, and print_info's exit 0 made the step report success.
+    # Errors are deliberately not suppressed here, and any failure fails the step.
+    wp eval-file - --allow-root <<'FORMS_PHP'
+<?php
+$config_file = '/forms-config.json';
+
+if ( ! class_exists( 'WPCF7_ContactForm' ) ) {
+    WP_CLI::error( 'Contact Form 7 is not active - cannot create forms' );
+}
+
+$config = json_decode( file_get_contents( $config_file ), true );
+if ( ! is_array( $config ) || empty( $config['forms'] ) || ! is_array( $config['forms'] ) ) {
+    WP_CLI::error( 'forms-config.json has no usable "forms" array: ' . json_last_error_msg() );
+}
+
+// forms-config.json carries each form's fields and mail body, but no envelope.
+$default_sender    = '[_site_title] <wordpress@techgearpro.local>';
+$default_recipient = 'admin@techgearpro.local';
+
+$created = 0;
+$skipped = 0;
+$failed  = 0;
+
+foreach ( $config['forms'] as $spec ) {
+    $title = isset( $spec['title'] ) ? trim( $spec['title'] ) : '';
+
+    if ( '' === $title ) {
+        WP_CLI::warning( '  Form entry with no title - skipping' );
+        $failed++;
+        continue;
+    }
+
+    // Idempotent: a form with this title already exists, leave it alone.
+    $existing = get_posts( array(
+        'post_type'   => 'wpcf7_contact_form',
+        'title'       => $title,
+        'post_status' => 'any',
+        'numberposts' => 1,
+        'fields'      => 'ids',
+    ) );
+    if ( ! empty( $existing ) ) {
+        WP_CLI::log( "  Skipped (exists): $title" );
+        $skipped++;
+        continue;
+    }
+
+    if ( empty( $spec['form_content'] ) ) {
+        WP_CLI::warning( "  No form_content for: $title" );
+        $failed++;
+        continue;
+    }
+
+    // mail_template is one blob whose first line is "Subject: ...".
+    // Split it into the structured subject/body CF7 expects.
+    $subject = sprintf( '[_site_title] - %s', $title );
+    $body    = isset( $spec['mail_template'] ) ? $spec['mail_template'] : '';
+    if ( preg_match( '/^\s*Subject:\s*(.+?)\r?\n(.*)$/s', $body, $m ) ) {
+        $subject = trim( $m[1] );
+        $body    = ltrim( $m[2], "\r\n" );
+    }
+
+    $form = WPCF7_ContactForm::get_template( array( 'title' => $title ) );
+    $form->set_title( $title );
+    $form->set_properties( array(
+        'form' => $spec['form_content'],
+        'mail' => array(
+            'subject'            => $subject,
+            'sender'             => $default_sender,
+            'body'               => $body,
+            'recipient'          => $default_recipient,
+            'additional_headers' => 'Reply-To: [_site_admin_email]',
+            'attachments'        => '',
+            'use_html'           => 0,
+            'exclude_blank'      => 0,
         ),
-    ) ) );' --allow-root 2>/dev/null || print_info "Support form created"
+    ) );
+
+    $id = $form->save();
+    if ( ! $id ) {
+        WP_CLI::warning( "  FAILED to save: $title" );
+        $failed++;
+        continue;
+    }
+
+    WP_CLI::log( sprintf( '  Created: %s (ID %d)', $title, $id ) );
+    $created++;
+}
+
+WP_CLI::log( sprintf(
+    'Contact forms - created: %d | skipped: %d | failed: %d',
+    $created, $skipped, $failed
+) );
+
+if ( $failed > 0 ) {
+    WP_CLI::error( sprintf( '%d contact form(s) could not be created', $failed ) );
+}
+FORMS_PHP
+    local rc=$?
+
+    if [ $rc -ne 0 ]; then
+        print_error "Contact form creation failed (wp exit $rc)"
+        return 1
+    fi
 
     print_status "Contact forms configured"
 }

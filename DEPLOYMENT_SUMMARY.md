@@ -16,7 +16,7 @@ Complete WordPress + WooCommerce WAF training environment with intentional false
 
 ### Data Files
 - **products.csv** - 50 tech products with special characters in names
-- **forms-config.json** - Specification for five CF7 forms with false positive triggers. Not read at runtime: `setup.sh` inlines its own definitions for two of them (Contact Us, Technical Support); Product Inquiry, Partnership Request and Developer API Access are not yet implemented.
+- **forms-config.json** - Five CF7 form definitions with false positive triggers (Contact Us, Technical Support, Product Inquiry, Partnership Request, Developer API Access), all created by `setup.sh:configure_contact_forms`
 
 ### Documentation
 - **README.md** - Comprehensive setup and usage guide (500+ lines)
@@ -157,7 +157,7 @@ Total: 11 files, 2100+ lines of code/config/documentation
 | docker-compose.yml | 96 | Container orchestration |
 | nginx.conf | 84 | Web server config |
 | products.csv | 50 | Sample products |
-| forms-config.json | 29 | Form spec (unimplemented; not read at runtime) |
+| forms-config.json | 29 | Form definitions (all 5 created by setup.sh) |
 | .env.example | - | Environment template |
 
 ## 🐛 Troubleshooting

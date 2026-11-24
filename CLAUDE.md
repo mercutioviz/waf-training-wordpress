@@ -26,13 +26,31 @@ Site on http://localhost:8080 and https://localhost:8443 (self-signed, expect a
 browser warning), phpMyAdmin on :8081.
 
 `setup.sh` is **step-addressable** — pass one or more function names from its
-`ALL_STEPS` array to re-run just those instead of the whole 5-10 minute pass.
-This is the main iteration loop when working on seeded content:
+`ALL_STEPS` array to re-run just those instead of the whole pass. A full cold
+run took ~47 minutes on a clean volume, dominated by `install_plugins` (16
+plugins) and `add_product_images` (49 Unsplash downloads); the README's "5-10
+minutes" is optimistic. Step mode is the main iteration loop for seeded content:
 
 ```bash
 docker-compose exec wpcli bash /setup.sh import_products create_comments
 docker-compose exec wpcli bash /setup.sh nonexistent_step   # prints all step names
 ```
+
+**After editing `setup.sh`, `products.csv`, `forms-config.json` or `wp-cli.yml`,
+recreate the wpcli container before re-running a step:**
+
+```bash
+docker-compose up -d --force-recreate wpcli
+```
+
+Those four are *single-file* bind mounts, and Docker pins them to the file's
+inode. Any editor that writes a temp file and renames over the original —
+`sed -i`, vim, most IDEs — leaves the host with a new inode while the container
+keeps serving the old contents indefinitely. The symptom is an edit that seems
+to do nothing: the step runs, reports success, and executes the previous
+version of the code. Confirm with
+`docker-compose exec wpcli stat -c %i /setup.sh` against `stat -c %i setup.sh`.
+A `restart` is not enough; the container must be recreated.
 
 There is no unit test suite or linter. `test-waf.sh` is the closest thing: it
 replays about two dozen legitimate-but-suspicious requests through a shared
@@ -101,23 +119,27 @@ of `nginx.conf` is load-bearing: nginx scrubs its environment before forking
 workers, so without it the shim loads and silently logs nothing. It is a config
 error inside `http{}`.
 
-**Content seeding** lives in `setup.sh` (~1200 lines, one function per step),
-with products read from `products.csv`. The Contact Form 7 forms are *not* read
-from a file — they are inlined as `wp eval` PHP in
-`setup.sh:configure_contact_forms`, which is where to edit them. Product images
-are likewise handled in-script by `add_product_images()`, which resolves
-products by SKU (`wp post list --meta_key=_sku`) so it survives a re-import.
-When adding seeded content, make it *plausibly legitimate yet rule-tripping* —
-that's the whole design constraint. `FALSE_POSITIVES.md` catalogs which trigger
-is meant to fire which rule category; update it alongside any content change.
+**Content seeding** lives in `setup.sh` (~1200 lines, one function per step).
+Products come from `products.csv`; the Contact Form 7 forms come from
+`forms-config.json`, which `configure_contact_forms` reads in full, creating any
+form whose title doesn't already exist (all five: Contact Us, Technical Support,
+Product Inquiry, Partnership Request, Developer API Access). Product images are
+handled in-script by `add_product_images()`, which resolves products by SKU
+(`wp post list --meta_key=_sku`) so it survives a re-import. When adding seeded
+content, make it *plausibly legitimate yet rule-tripping* — that's the whole
+design constraint. `FALSE_POSITIVES.md` catalogs which trigger is meant to fire
+which rule category; update it alongside any content change.
 
-**`forms-config.json` is an unimplemented spec, not live config.** Nothing
-reads it — it is bind-mounted into the wpcli container and otherwise unused. It
-defines five forms where `configure_contact_forms` creates only two (Contact Us,
-Technical Support). **Product Inquiry, Partnership Request and Developer API
-Access are outstanding**: they exist nowhere but this file, and its
-`form_content` fields are the spec to build them from. Don't mistake it for a
-stale artifact and delete it.
+**Two plugin-API workarounds, because this failure mode keeps recurring.**
+`import_products` parses the CSV in PHP since `wp wc product import` was removed
+in WooCommerce 10.x. `configure_contact_forms` uses CF7's instance API
+(`WPCF7_ContactForm::get_template()` → `set_title()` → `set_properties()` →
+`save()`); `save()` is *not* static, and calling it statically is an immediate
+PHP fatal. When a plugin's API moves under one of these steps, let the error
+surface — **never wrap `wp eval` in `2>/dev/null || print_info "...created"`**.
+That idiom runs its fallback on the *failure* path, so it logged "Contact form
+created" at exactly the moment creation fatally failed, and `print_info`'s exit 0
+made the step report success while creating nothing.
 
 ## Gotchas
 
