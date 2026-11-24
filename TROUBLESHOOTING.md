@@ -183,9 +183,22 @@ sudo docker compose exec wpcli bash /setup.sh
 sudo docker compose exec wpcli ls -l /products.csv
 ```
 
-### Check 2: Manually import
+### Check 2: Re-run the import step
 ```bash
-sudo docker compose exec wpcli wp wc product import /products.csv --user=admin --allow-root
+sudo docker compose exec wpcli bash /setup.sh import_products
+```
+
+There is **no `wp wc product import` command** — WooCommerce removed it in 10.x
+and it is still absent in 11.x (`wp wc product` offers only
+`create`/`delete`/`get`/`list`/`update`). `import_products` therefore parses
+`products.csv` itself via `wp eval-file`, so the step above is the only
+supported way to replay the import. If you edited `setup.sh` or
+`products.csv` first, recreate the container before re-running — those are
+single-file bind mounts and the container otherwise keeps serving the old
+contents:
+
+```bash
+sudo docker compose up -d --force-recreate wpcli
 ```
 
 ### Check 3: Check for errors
@@ -193,15 +206,75 @@ sudo docker compose exec wpcli wp wc product import /products.csv --user=admin -
 sudo docker compose logs wordpress | grep -i error
 ```
 
-### Check 4: Import one product at a time
+The importer warns per bad row (`Skipped line N: expected X cols, got Y`),
+usually from a stray comma or an unescaped quote in `products.csv`. Those
+warnings appear in the step output, not in the container logs.
+
+### Check 4: Create one product by hand
 ```bash
-# Create a test product
+# Confirms WooCommerce itself can create products, isolating CSV problems
 sudo docker compose exec wpcli wp wc product create \
   --name="Test Product" \
   --type=simple \
   --regular_price=99.99 \
   --user=admin --allow-root
 ```
+
+### Check 5: Confirm what actually landed
+```bash
+sudo docker compose exec wpcli wp post list --post_type=product \
+  --post_status=publish --format=count --allow-root
+```
+
+A healthy run reports 49. If this returns a sane count but the storefront still
+looks empty, the import is fine and you are hitting the coming-soon placeholder
+instead — see
+[Store Empty / "Great things are on the horizon"](#store-empty--great-things-are-on-the-horizon).
+
+## Store Empty / "Great things are on the horizon"
+
+### Symptoms
+- The shop, product pages, or homepage show a placeholder reading
+  **"Great things are on the horizon"** instead of products.
+- **It only happens in some browsers.** One browser shows the real store, others
+  show the placeholder — including in a private/incognito tab.
+- `wp post list --post_type=product --post_status=publish --format=count`
+  reports plenty of products.
+
+This is **not** a WAF, cache, or browser bug. WooCommerce's "Launch Your Store"
+feature defaults new installs to *Coming soon* mode, and it exempts users with
+`manage_woocommerce`. So the browser holding your admin session sees the store
+while every logged-out browser sees the placeholder. A private tab reproduces
+the symptom rather than fixing it, because a private tab is also logged out —
+which is exactly what makes this look browser-specific when it isn't.
+
+`test-waf.sh` is logged out too, so while this is on, its shop and product rows
+report `PASS` against the placeholder and never reach WooCommerce at all.
+
+### Check: read the two options
+```bash
+sudo docker compose exec wpcli wp option get woocommerce_coming_soon
+sudo docker compose exec wpcli wp option get woocommerce_store_pages_only
+```
+`coming_soon = yes` is the cause. `store_pages_only = yes` explains why only
+store URLs are affected and ordinary pages like `/about-us/` render fine.
+
+### Solution
+```bash
+sudo docker compose exec wpcli wp option update woocommerce_coming_soon no
+sudo docker compose exec wpcli wp option update woocommerce_store_pages_only no
+```
+
+### Verify anonymously, not in a browser
+A browser with an admin session looked fine the whole time, so it cannot confirm
+the fix. Use a request with no cookies:
+```bash
+curl -s http://localhost:8080/shop/ | grep -c horizon   # expect 0
+```
+
+`setup.sh:configure_woocommerce` now sets both options, so a fresh
+`docker compose down -v` rebuild comes up with the store public. If you restore
+an older `setup.sh` or provision WooCommerce by hand, expect this to return.
 
 ## Permission Errors
 

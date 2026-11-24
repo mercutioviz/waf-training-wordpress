@@ -187,6 +187,14 @@ configure_woocommerce() {
     wp option update woocommerce_enable_coupons "yes" --allow-root
     wp wc tool run install_pages --user=admin --allow-root
 
+    # Take the store out of WooCommerce's "Coming soon" mode (Launch Your Store).
+    # New installs default this to "yes", which serves anonymous visitors a
+    # "Great things are on the horizon" placeholder instead of the shop. Admins
+    # are exempt, so a logged-in browser looks fine while every logged-out
+    # browser -- and test-waf.sh -- sees the placeholder, not WooCommerce.
+    wp option update woocommerce_coming_soon "no" --allow-root
+    wp option update woocommerce_store_pages_only "no" --allow-root
+
     # Dismiss the WooCommerce setup wizard / onboarding nag
     print_info "Dismissing WooCommerce setup wizard..."
     wp option update woocommerce_onboarding_profile '{"completed":true}' --format=json --allow-root 2>/dev/null || true
