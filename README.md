@@ -26,15 +26,26 @@ This Docker-based setup creates a realistic e-commerce site with intentionally c
 - WooCommerce - E-commerce platform
 - Contact Form 7 - Multiple forms with file upload
 - WPForms Lite - Alternative form builder
-- Wordfence Security - Security plugin (generates its own traffic)
 - Limit Login Attempts - Brute force protection
 - Yoast SEO - SEO optimization (heavy admin operations)
-- Jetpack - External API calls and features
 - Advanced Custom Fields - Custom product fields
 - Elementor - Page builder
 - Query Monitor - Development/debugging tool
 - User Switching - Quick user role changes
 - FakerPress - Content generation
+
+### Installed but Deactivated
+Both are installed so an admin can switch them on deliberately, but they are
+left inactive because they work against the training goal:
+
+- **Wordfence Security** - ships its own WAF. With it active you are tuning two
+  WAFs at once and cannot tell which layer blocked a request. Also nags for a
+  license key in wp-admin.
+- **Jetpack** - adds no false-positive surface, wants a wordpress.com
+  connection, and makes blocking outbound API calls. Its dashboard was slow
+  enough to exceed an upstream proxy's origin timeout (seen as a 503), and with
+  it active a plain `http://localhost:8080/` page load took ~24s versus ~0.3s
+  with it off.
 
 ## Quick Start
 

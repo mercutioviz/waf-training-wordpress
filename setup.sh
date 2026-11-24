@@ -123,17 +123,54 @@ configure_permalinks() {
 
 install_plugins() {
     print_info "Installing plugins (this may take a few minutes)..."
+
+    # Installed AND activated - these generate the traffic the lab is about.
     local PLUGINS=(
-        "woocommerce" "contact-form-7" "wpforms-lite" "wordfence"
-        "limit-login-attempts-reloaded" "wordpress-seo" "jetpack"
+        "woocommerce" "contact-form-7" "wpforms-lite"
+        "limit-login-attempts-reloaded" "wordpress-seo"
         "advanced-custom-fields" "wp-mail-smtp" "elementor"
         "ewww-image-optimizer" "updraftplus" "query-monitor"
         "user-switching" "wp-crontrol" "fakerpress"
     )
+
+    # Installed but left INACTIVE, so an admin can switch them on deliberately.
+    #
+    # wordfence: its own WAF sits in front of the application, so with it active
+    #   you are tuning two WAFs at once and cannot tell which layer blocked a
+    #   request - the opposite of what this environment is for. It also nags for
+    #   a license key in wp-admin.
+    # jetpack: contributes no false-positive surface. It wants a wordpress.com
+    #   connection, adds outbound API calls and admin XHR noise, and its
+    #   dashboard is slow enough to trip upstream proxy timeouts.
+    local PLUGINS_INACTIVE=(
+        "wordfence" "jetpack"
+    )
+
+    local failed=()
+
     for plugin in "${PLUGINS[@]}"; do
-        wp plugin install "$plugin" --activate --allow-root
-        print_status "Installed: $plugin"
+        if wp plugin install "$plugin" --activate --allow-root; then
+            print_status "Installed + activated: $plugin"
+        else
+            print_error "FAILED to install: $plugin"
+            failed+=("$plugin")
+        fi
     done
+
+    for plugin in "${PLUGINS_INACTIVE[@]}"; do
+        if wp plugin install "$plugin" --allow-root; then
+            print_status "Installed (left inactive): $plugin"
+        else
+            print_error "FAILED to install: $plugin"
+            failed+=("$plugin")
+        fi
+    done
+
+    if [ ${#failed[@]} -gt 0 ]; then
+        print_error "${#failed[@]} plugin(s) failed to install: ${failed[*]}"
+        return 1
+    fi
+
     print_status "All plugins installed"
 }
 
@@ -1213,12 +1250,14 @@ print_setup_summary() {
     echo "  - WooCommerce (with sample products)"
     echo "  - Contact Form 7 (multiple forms)"
     echo "  - WPForms Lite"
-    echo "  - Wordfence Security"
     echo "  - Limit Login Attempts"
     echo "  - Yoast SEO"
-    echo "  - Jetpack"
     echo "  - Advanced Custom Fields"
     echo "  - And more..."
+    echo ""
+    echo -e "${YELLOW}Installed but INACTIVE (activate in wp-admin if wanted):${NC}"
+    echo "  - Wordfence Security  (its own WAF would mask the one you're tuning)"
+    echo "  - Jetpack             (no FP surface; slow dashboard, outbound calls)"
     echo ""
     echo -e "${YELLOW}WAF Training Features:${NC}"
     echo "  ✓ 50+ products with images and special characters in names"
