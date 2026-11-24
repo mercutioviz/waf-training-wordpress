@@ -613,6 +613,35 @@ create_pages() {
     # Use PHP API to create pages idempotently (skip if slug already exists)
     wp eval-file - --allow-root <<'PAGES_PHP'
 <?php
+// The Contact page embeds the Technical Support form - the richest source of
+// WAF false positives, since its fields invite error messages, stack traces and
+// config snippets (README Scenario 2).
+//
+// A CF7 shortcode references a post ID, which is install-specific, so look it up
+// by title instead of hardcoding one. This step is ordered after
+// configure_contact_forms in ALL_STEPS so the form already exists; the fallback
+// covers running create_pages on its own against a site without the forms.
+$support_form = get_posts( array(
+    'post_type'   => 'wpcf7_contact_form',
+    'title'       => 'Technical Support',
+    'post_status' => 'any',
+    'numberposts' => 1,
+    'fields'      => 'ids',
+) );
+
+if ( ! empty( $support_form ) ) {
+    $support_form_block = sprintf(
+        '[contact-form-7 id="%d" title="Technical Support"]',
+        $support_form[0]
+    );
+} else {
+    $support_form_block = '<p><em>Support form not available.</em></p>';
+    WP_CLI::warning(
+        'Technical Support form not found - Contact page has no form. '
+        . 'Run: bash /setup.sh configure_contact_forms create_pages'
+    );
+}
+
 $pages = array(
     array(
         'slug' => 'about-us',
@@ -644,7 +673,7 @@ $pages = array(
         'title' => 'Contact',
         'content' => '<h2>Get in Touch</h2>
 <p>Have questions about our products? Need technical support? We are here to help! Fill out the form below and our team will get back to you within 24 hours.</p>
-[contact-form-7 id="10" title="Contact form 1"]
+' . $support_form_block . '
 <h3>Other Ways to Reach Us</h3>
 <p><strong>Email:</strong> support@techgearpro.local<br><strong>Phone:</strong> (555) 123-4567<br><strong>Hours:</strong> Monday - Friday, 9:00 AM - 6:00 PM PST</p>
 <p><strong>Address:</strong><br>TechGear Pro<br>123 Tech Street<br>San Francisco, CA 94102</p>',
@@ -1255,8 +1284,10 @@ ALL_STEPS=(
     "create_users"
     "create_blog_posts"
     "create_comments"
-    "create_pages"
+    # Must precede create_pages: the Contact page embeds the Technical Support
+    # form by ID, looked up by title, so the form has to exist first.
     "configure_contact_forms"
+    "create_pages"
     "configure_site_settings"
     "configure_navigation"
     "create_sample_orders"

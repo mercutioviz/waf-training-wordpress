@@ -125,9 +125,16 @@ Products come from `products.csv`; the Contact Form 7 forms come from
 form whose title doesn't already exist (all five: Contact Us, Technical Support,
 Product Inquiry, Partnership Request, Developer API Access). Product images are
 handled in-script by `add_product_images()`, which resolves products by SKU
-(`wp post list --meta_key=_sku`) so it survives a re-import. When adding seeded
-content, make it *plausibly legitimate yet rule-tripping* — that's the whole
-design constraint. `FALSE_POSITIVES.md` catalogs which trigger is meant to fire
+(`wp post list --meta_key=_sku`) so it survives a re-import.
+
+`ALL_STEPS` order carries one real dependency: `configure_contact_forms` must
+stay ahead of `create_pages`, because the Contact page embeds the Technical
+Support form by shortcode ID and `create_pages` resolves that ID by looking the
+form up by title. Run `create_pages` alone against a site without the forms and
+it warns and emits a formless Contact page rather than failing.
+
+When adding seeded content, make it *plausibly legitimate yet rule-tripping* —
+that's the whole design constraint. `FALSE_POSITIVES.md` catalogs which trigger is meant to fire
 which rule category; update it alongside any content change.
 
 **Two plugin-API workarounds, because this failure mode keeps recurring.**
